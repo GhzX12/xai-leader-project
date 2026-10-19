@@ -1,0 +1,30 @@
+{
+  "name": "gm-agent-experiment",
+  "version": "1.0.0",
+  "private": true,
+  "description": "XAI Leader (AI General Manager) experiment: group login, briefing + chat, PDF submission, behind-the-scenes grading",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "@supabase/supabase-js": "^2.118.0",
+    "next": "^16.4.2",
+    "pdf-lib": "^1.17.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
