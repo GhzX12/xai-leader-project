@@ -370,6 +370,7 @@ export default function AdminPage() {
                             <thead>
                               <tr>
                                 <th>Kelompok</th>
+                                <th>Data</th>
                                 <th>Token</th>
                                 <th>PIC</th>
                                 <th>Status</th>
@@ -386,8 +387,9 @@ export default function AdminPage() {
                                   onClick={() => r.session && void loadDetail(r.session.id)}
                                 >
                                   <td>
-                                    <b>{r.groupName}</b> <span className="muted small">V{r.datasetVersion}</span>
+                                    <b>{r.groupName}</b>
                                   </td>
+                                  <td className="muted">V{r.datasetVersion}</td>
                                   <td className="token-chip">{r.token ?? "—"}</td>
                                   <td>{r.session?.pic_name ?? "—"}</td>
                                   <td>

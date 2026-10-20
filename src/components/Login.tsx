@@ -4,10 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/client-api";
 import { parseSessionLabel } from "@/lib/experiment";
 import type { AppState } from "@/lib/types";
-
-type ClassOption = { name: string; groups: string[] };
-
-const OTHER = "__other__";
+import TeamPicker, { type TeamClass } from "./TeamPicker";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 function nowLabel() {
@@ -22,13 +19,12 @@ const initials = (name: string) =>
     .map((w) => w[0]?.toUpperCase())
     .join("");
 
-/** Tahap 1: pick the team → its members appear → pick the PIC, enter the session start time and the paper token. */
+/** Tahap 1: pick the team → its members appear → pick the PIC, confirm the session start time and enter the paper token. */
 export default function Login({ onState }: { onState: (s: AppState) => void }) {
-  const [classes, setClasses] = useState<ClassOption[] | null>(null);
+  const [classes, setClasses] = useState<TeamClass[] | null>(null);
   const [groupName, setGroupName] = useState("");
   const [members, setMembers] = useState<string[] | null>(null);
-  const [picChoice, setPicChoice] = useState("");
-  const [picOther, setPicOther] = useState("");
+  const [picName, setPicName] = useState("");
   const [sessionLabel, setSessionLabel] = useState("");
   const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +32,7 @@ export default function Login({ onState }: { onState: (s: AppState) => void }) {
 
   useEffect(() => {
     setSessionLabel(nowLabel());
-    void api<{ classes: ClassOption[] }>("/api/groups").then((res) => {
+    void api<{ classes: TeamClass[] }>("/api/groups").then((res) => {
       if (res.ok) setClasses(res.data.classes);
       else setError("Daftar kelompok gagal dimuat. Coba muat ulang halaman ini.");
     });
@@ -44,8 +40,7 @@ export default function Login({ onState }: { onState: (s: AppState) => void }) {
 
   useEffect(() => {
     setMembers(null);
-    setPicChoice("");
-    setPicOther("");
+    setPicName("");
     if (!groupName) return;
     let cancelled = false;
     void api<{ members: string[] }>(`/api/groups?team=${encodeURIComponent(groupName)}`).then((res) => {
@@ -57,7 +52,6 @@ export default function Login({ onState }: { onState: (s: AppState) => void }) {
     };
   }, [groupName]);
 
-  const picName = picChoice === OTHER ? picOther.trim() : picChoice;
   const parsed = parseSessionLabel(sessionLabel);
   const labelInvalid = sessionLabel.trim().length > 0 && !parsed;
   const ready = !!groupName && picName.length >= 2 && !!parsed && token.trim().length >= 4;
@@ -76,7 +70,7 @@ export default function Login({ onState }: { onState: (s: AppState) => void }) {
   };
 
   return (
-    <div className="login-stage stage-enter">
+    <div className="login-stage">
       <div className="login-bg" aria-hidden />
       <form className="login-panel" onSubmit={submit} autoComplete="off">
         <div className="seal" aria-hidden>
@@ -92,18 +86,7 @@ export default function Login({ onState }: { onState: (s: AppState) => void }) {
           <p className="block-title">1 · Identitas kelompok</p>
           <div className="field">
             <label htmlFor="group">Kelompok</label>
-            <select id="group" value={groupName} onChange={(e) => setGroupName(e.target.value)} disabled={!classes}>
-              <option value="">{classes ? "Pilih kelompok kalian…" : "Memuat…"}</option>
-              {classes?.map((c) => (
-                <optgroup key={c.name} label={c.name}>
-                  {c.groups.map((g) => (
-                    <option key={g} value={g}>
-                      {g}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            <TeamPicker classes={classes} value={groupName} onChange={setGroupName} />
           </div>
 
           {groupName && (
@@ -116,42 +99,23 @@ export default function Login({ onState }: { onState: (s: AppState) => void }) {
                 <div className="center-screen" style={{ minHeight: 90 }}>
                   <div className="loader" />
                 </div>
+              ) : members.length === 0 ? (
+                <div className="alert warn">Data anggota kelompok ini belum tersedia. Hubungi peneliti.</div>
               ) : (
                 <div className="roster-list">
                   {members.map((m, i) => (
                     <button
                       type="button"
                       key={m}
-                      className={`roster-item ${picChoice === m ? "selected" : ""}`}
+                      className={`roster-item ${picName === m ? "selected" : ""}`}
                       style={{ ["--i" as string]: i }}
-                      onClick={() => setPicChoice(m)}
+                      onClick={() => setPicName(m)}
                     >
                       <span className="ini">{initials(m)}</span>
                       <span className="nm">{m}</span>
-                      <span className="pic-tag">{picChoice === m ? "PIC" : "Pilih"}</span>
+                      <span className="pic-tag">{picName === m ? "PIC" : "Pilih"}</span>
                     </button>
                   ))}
-                  <button
-                    type="button"
-                    className={`roster-item ${picChoice === OTHER ? "selected" : ""}`}
-                    style={{ ["--i" as string]: members.length }}
-                    onClick={() => setPicChoice(OTHER)}
-                  >
-                    <span className="ini">+</span>
-                    <span className="nm">Nama lain…</span>
-                    <span className="pic-tag">{picChoice === OTHER ? "PIC" : ""}</span>
-                  </button>
-                </div>
-              )}
-              {picChoice === OTHER && (
-                <div className="field" style={{ marginTop: 10 }}>
-                  <input
-                    value={picOther}
-                    onChange={(e) => setPicOther(e.target.value)}
-                    placeholder="Ketik nama PIC"
-                    maxLength={80}
-                    autoFocus
-                  />
                 </div>
               )}
             </div>
@@ -160,35 +124,37 @@ export default function Login({ onState }: { onState: (s: AppState) => void }) {
 
         <div className="form-block">
           <p className="block-title">2 · Waktu &amp; token</p>
-          <div className="field">
-            <label htmlFor="sesi">Sesi (mulai mengerjakan)</label>
-            <input
-              id="sesi"
-              value={sessionLabel}
-              onChange={(e) => setSessionLabel(e.target.value)}
-              placeholder="DD/MM/YY: Jam.Menit"
-              inputMode="numeric"
-              maxLength={20}
-              aria-invalid={labelInvalid}
-              style={labelInvalid ? { borderColor: "var(--danger)" } : undefined}
-            />
-            <span className="hint">
-              {labelInvalid ? "Formatnya belum pas. Contoh: 21/10/26: 14.30" : "Format DD/MM/YY: Jam.Menit. Sudah terisi otomatis, silakan ubah kalau perlu."}
-            </span>
-          </div>
-          <div className="field">
-            <label htmlFor="token">Token kelompok</label>
-            <input
-              id="token"
-              className="token-input"
-              value={token}
-              onChange={(e) => setToken(e.target.value.replace(/\s/g, "").toUpperCase())}
-              placeholder="Token dari kertas"
-              maxLength={16}
-              spellCheck={false}
-              autoCapitalize="characters"
-            />
-            <span className="hint">Token dibagikan peneliti lewat kertas. Hanya pemegang token hari ini yang bisa masuk.</span>
+          <div className="login-grid">
+            <div className="field">
+              <label htmlFor="sesi">Sesi (mulai mengerjakan)</label>
+              <input
+                id="sesi"
+                value={sessionLabel}
+                onChange={(e) => setSessionLabel(e.target.value)}
+                placeholder="DD/MM/YY: Jam.Menit"
+                inputMode="numeric"
+                maxLength={20}
+                aria-invalid={labelInvalid}
+                style={labelInvalid ? { borderColor: "var(--danger)" } : undefined}
+              />
+              <span className="hint">
+                {labelInvalid ? "Formatnya belum pas. Contoh: 21/10/26: 14.30" : "Format DD/MM/YY: Jam.Menit. Terisi otomatis, boleh diubah."}
+              </span>
+            </div>
+            <div className="field">
+              <label htmlFor="token">Token kelompok</label>
+              <input
+                id="token"
+                className="token-input"
+                value={token}
+                onChange={(e) => setToken(e.target.value.replace(/\s/g, "").toUpperCase())}
+                placeholder="Token dari kertas"
+                maxLength={16}
+                spellCheck={false}
+                autoCapitalize="characters"
+              />
+              <span className="hint">Token dibagikan peneliti lewat kertas.</span>
+            </div>
           </div>
         </div>
 
@@ -212,7 +178,6 @@ export default function Login({ onState }: { onState: (s: AppState) => void }) {
             Waktu tercatat
           </span>
         </div>
-        <p className="login-tagline">Access is privilege. Prove your identity.</p>
       </form>
     </div>
   );

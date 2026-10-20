@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Orbitron, Space_Grotesk } from "next/font/google";
+import { Manrope, Orbitron } from "next/font/google";
 import "./globals.css";
 
-const body = Space_Grotesk({ subsets: ["latin"], variable: "--font-body", display: "swap" });
+const body = Manrope({ subsets: ["latin"], variable: "--font-body", display: "swap" });
 const display = Orbitron({ subsets: ["latin"], variable: "--font-display", display: "swap" });
 
 export const metadata: Metadata = {

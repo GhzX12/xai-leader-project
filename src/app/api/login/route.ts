@@ -76,6 +76,12 @@ export async function POST(req: Request) {
 
   let { data: session } = await supabase.from("sessions").select("*").eq("group_code", code).maybeSingle();
   if (session) {
+    // A returning team: whoever logs in now is the PIC operating this device.
+    if (session.pic_name !== picName) {
+      await supabase.from("sessions").update({ pic_name: picName }).eq("id", session.id);
+      await logEvent(session.id, "pic_changed", { from: session.pic_name, to: picName });
+      session.pic_name = picName;
+    }
     await logEvent(session.id, "login_resume", { pic_name: picName, session_label: parsedLabel.label });
   } else {
     const inserted = await supabase

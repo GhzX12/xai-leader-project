@@ -10,10 +10,9 @@ export const MODULE_VERSION = "v1.1";
 /** Teams may ask XAI Leader as many questions as they like. */
 export const MAX_QUESTIONS_DB_GUARD = 1_000_000;
 
-/** Each team has exactly one session row; its group code is "<Team>-1". */
-export const SESSION_SUFFIX = "-1";
-export const teamCode = (teamName: string) => `${teamName}${SESSION_SUFFIX}`;
-export const teamLabel = (code: string) => (code.endsWith(SESSION_SUFFIX) ? code.slice(0, -SESSION_SUFFIX.length) : code);
+/** Each team has exactly one session; its group code is simply the team name, e.g. "Alpha-1". */
+export const teamCode = (teamName: string) => teamName;
+export const teamLabel = (code: string) => code;
 
 /** Minimum pages of the proposal PDF (one page per required section). */
 export const MIN_PDF_PAGES = 5;
