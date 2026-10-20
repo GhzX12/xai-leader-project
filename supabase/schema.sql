@@ -14,7 +14,8 @@ create table if not exists public.groups (
   group_name      text not null,
   session_no      int  not null check (session_no > 0),
   dataset_version int  not null check (dataset_version between 1 and 5),
-  active          boolean not null default true,
+  class_name      text,            -- e.g. "Kelas A" (groups the Tahap 1 dropdown)
+  active         boolean not null default true,
   created_at      timestamptz not null default now(),
   unique (group_name, session_no)
 );

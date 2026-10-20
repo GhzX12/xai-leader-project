@@ -5,11 +5,12 @@ import { api } from "@/lib/client-api";
 import { EXPERIMENT_TITLE } from "@/lib/experiment";
 import type { AppState } from "@/lib/types";
 
-type Options = { groupNames: string[]; sessions: number[] };
+type Options = { classes: { name: string; groups: string[] }[]; groupNames: string[]; sessions: number[] };
 
-/** Tahap 1: pick group + session from the dropdowns; the server verifies "<Kelompok>-<Sesi>". */
+/** Tahap 1: pick class, group + session from the dropdowns; the server verifies "<Kelompok>-<Sesi>". */
 export default function Login({ onState }: { onState: (s: AppState) => void }) {
   const [options, setOptions] = useState<Options | null>(null);
+  const [className, setClassName] = useState("");
   const [groupName, setGroupName] = useState("");
   const [sessionNo, setSessionNo] = useState("");
   const [picName, setPicName] = useState("");
@@ -23,6 +24,10 @@ export default function Login({ onState }: { onState: (s: AppState) => void }) {
     });
   }, []);
 
+  const groupChoices = className
+    ? (options?.classes.find((c) => c.name === className)?.groups ?? [])
+    : (options?.groupNames ?? []);
+  const showClasses = (options?.classes.filter((c) => c.name).length ?? 0) > 0;
   const code = groupName && sessionNo ? `${groupName}-${sessionNo}` : null;
 
   const submit = async (e: React.FormEvent) => {
@@ -43,11 +48,37 @@ export default function Login({ onState }: { onState: (s: AppState) => void }) {
 
         <form onSubmit={submit}>
           <div className="row">
+            {showClasses && (
+              <div className="field">
+                <label htmlFor="class">Kelas</label>
+                <select
+                  id="class"
+                  value={className}
+                  onChange={(e) => {
+                    setClassName(e.target.value);
+                    setGroupName("");
+                  }}
+                  disabled={!options}
+                >
+                  <option value="">Pilih kelas…</option>
+                  {options?.classes.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="field">
               <label htmlFor="group">Kelompok</label>
-              <select id="group" value={groupName} onChange={(e) => setGroupName(e.target.value)} disabled={!options}>
+              <select
+                id="group"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                disabled={!options || (showClasses && !className)}
+              >
                 <option value="">{options ? "Pilih kelompok…" : "Memuat…"}</option>
-                {options?.groupNames.map((g) => (
+                {groupChoices.map((g) => (
                   <option key={g} value={g}>
                     {g}
                   </option>
