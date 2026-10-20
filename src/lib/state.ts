@@ -1,6 +1,5 @@
 import "server-only";
 import { DATASETS } from "./datasets";
-import { MAX_QUESTIONS } from "./experiment";
 import { groupOf } from "./session";
 import { db } from "./supabase";
 import { toChatMessage, type AppState, type MessageRow, type SessionRow, type SubmissionRow } from "./types";
@@ -19,10 +18,12 @@ export async function buildState(session: SessionRow): Promise<AppState> {
 
   return {
     groupCode: session.group_code,
+    groupName: group.group_name,
+    className: group.class_name,
     picName: session.pic_name,
+    sessionLabel: session.session_label,
     stage: session.stage,
     questionsUsed: session.questions_used,
-    maxQuestions: MAX_QUESTIONS,
     dataset: session.stage === "briefing" ? [] : DATASETS[group.dataset_version],
     messages: ((messages ?? []) as MessageRow[]).map(toChatMessage),
     submission: sub ? { fileName: sub.file_name, pageCount: sub.page_count, submittedAt: sub.submitted_at } : null,

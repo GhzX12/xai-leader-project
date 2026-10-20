@@ -31,10 +31,12 @@ export async function currentSession(): Promise<SessionRow | null> {
   return (data as SessionRow | null) ?? null;
 }
 
-export async function groupOf(code: string): Promise<{ dataset_version: number; group_name: string; session_no: number }> {
+export async function groupOf(
+  code: string,
+): Promise<{ dataset_version: number; group_name: string; session_no: number; class_name: string | null }> {
   const { data, error } = await db()
     .from("groups")
-    .select("dataset_version, group_name, session_no")
+    .select("dataset_version, group_name, session_no, class_name")
     .eq("code", code)
     .single();
   if (error) throw new Error(error.message);

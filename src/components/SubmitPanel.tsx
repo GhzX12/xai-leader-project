@@ -74,9 +74,10 @@ export default function SubmitPanel({ onState, onBack }: { onState: (s: AppState
   return (
     <div className="narrow" style={{ margin: "0 auto" }}>
       <div className="card">
+        <p className="eyebrow">Tahap terakhir</p>
         <h1 className="page-title">Pengumpulan Proposal</h1>
         <p className="lead">
-          Unggah 1 file PDF, minimal {MIN_PDF_PAGES} halaman — satu halaman untuk setiap bagian berikut:
+          Unggah 1 file PDF minimal {MIN_PDF_PAGES} halaman, satu halaman untuk tiap bagian berikut:
         </p>
         <ol className="sections-list">
           {SUBMISSION_SECTIONS.map((s) => (
@@ -116,7 +117,7 @@ export default function SubmitPanel({ onState, onBack }: { onState: (s: AppState
             </>
           ) : (
             <>
-              <b>{status === "checking" ? "Memeriksa PDF…" : "Klik atau tarik file PDF ke sini"}</b>
+              <b>{status === "checking" ? "Memeriksa PDF…" : "Klik atau tarik file PDF kalian ke sini"}</b>
               <div className="small muted">Format PDF · maks. {MAX_PDF_BYTES / 1024 / 1024} MB</div>
             </>
           )}
@@ -139,7 +140,7 @@ export default function SubmitPanel({ onState, onBack }: { onState: (s: AppState
 
         <label className="check" style={{ marginTop: 12 }}>
           <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
-          <span>Kami sudah memeriksa isi proposal. Pengumpulan hanya bisa dilakukan satu kali dan tidak bisa diubah.</span>
+          <span>Kami sudah memeriksa isi proposal. Pengumpulan hanya bisa satu kali dan tidak bisa diubah setelahnya.</span>
         </label>
 
         {error && <div className="alert error">{error}</div>}

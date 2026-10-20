@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { askLeader } from "@/lib/claude";
-import { MAX_QUESTIONS } from "@/lib/experiment";
+import { MAX_QUESTIONS_DB_GUARD } from "@/lib/experiment";
 import { jsonError, readJson } from "@/lib/http";
 import { currentSession, groupOf } from "@/lib/session";
 import { db, logEvent } from "@/lib/supabase";
@@ -29,12 +29,12 @@ export async function POST(req: Request) {
   // Claim one of the team's questions atomically; refunded below if no answer is delivered.
   const { data: claimed, error: claimError } = await supabase.rpc("claim_question", {
     p_session: session.id,
-    p_max: MAX_QUESTIONS,
+    p_max: MAX_QUESTIONS_DB_GUARD,
   });
   if (claimError) return jsonError(500, "Gagal memproses kuota pertanyaan.");
   const questionNo = typeof claimed === "number" ? claimed : null;
   if (!questionNo) {
-    return jsonError(429, `Kuota ${MAX_QUESTIONS} pertanyaan tim Anda sudah habis.`, { questionsUsed: MAX_QUESTIONS });
+    return jsonError(409, "Sesi tanya jawab tidak aktif.");
   }
   const refund = () => supabase.rpc("release_question", { p_session: session.id });
 
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
     if (result.kind === "refused") {
       await refund();
       await logEvent(session.id, "model_refusal", { question, category: result.category, ...result.metadata });
-      return jsonError(422, "Pertanyaan ini tidak dapat diproses. Coba ubah kalimatnya — kuota pertanyaan Anda tidak berkurang.", {
+      return jsonError(422, "Pertanyaan ini tidak bisa diproses. Coba ubah kalimatnya sedikit, ya.", {
         questionsUsed: questionNo - 1,
       });
     }
@@ -100,7 +100,7 @@ export async function POST(req: Request) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("chat failed", message);
     await logEvent(session.id, "leader_error", { question_no: questionNo, message });
-    return jsonError(502, "XAI Leader sedang tidak bisa dihubungi. Coba kirim ulang — kuota pertanyaan Anda tidak berkurang.", {
+    return jsonError(502, "XAI Leader lagi sulit dihubungi. Coba kirim ulang sebentar lagi, ya.", {
       questionsUsed: questionNo - 1,
     });
   }

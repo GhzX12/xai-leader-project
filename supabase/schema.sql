@@ -15,10 +15,13 @@ create table if not exists public.groups (
   session_no      int  not null check (session_no > 0),
   dataset_version int  not null check (dataset_version between 1 and 5),
   class_name      text,            -- e.g. "Kelas A" (groups the Tahap 1 dropdown)
+  token           text,            -- paper token handed out per team (unique)
   active         boolean not null default true,
   created_at      timestamptz not null default now(),
   unique (group_name, session_no)
 );
+
+create unique index if not exists groups_token_key on public.groups (token) where token is not null;
 
 -- ---------------------------------------------------------------------
 -- 2. One experiment session per group code
@@ -34,7 +37,9 @@ create table if not exists public.sessions (
   started_at     timestamptz not null default now(),
   agreed_at      timestamptz,
   submitted_at   timestamptz,
-  last_seen_at   timestamptz not null default now()
+  last_seen_at   timestamptz not null default now(),
+  session_label  text,           -- "DD/MM/YY: HH.MM" typed at login (when the team started)
+  session_batch  text            -- "DD/MM/YY · HH.00" (admin dashboard groups by this)
 );
 
 -- ---------------------------------------------------------------------

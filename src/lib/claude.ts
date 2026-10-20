@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { MAX_QUESTIONS, MODULE_VERSION } from "./experiment";
+import { extractText, getDocumentProxy } from "unpdf";
+import { MODULE_VERSION } from "./experiment";
 import {
   GRADER_OUTPUT_SCHEMA,
   GRADER_SYSTEM_PROMPT,
@@ -36,7 +37,6 @@ async function complete(opts: {
   maxTokens: number;
   schemaName: string;
   schema: unknown;
-  pdf?: boolean;
 }) {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error("OPENROUTER_API_KEY belum diatur.");
@@ -47,8 +47,6 @@ async function complete(opts: {
     max_tokens: opts.maxTokens,
     response_format: { type: "json_schema", json_schema: { name: opts.schemaName, strict: true, schema: opts.schema } },
   };
-  // Extract PDF text server-side so any text model can read the proposal (free engine).
-  if (opts.pdf) body.plugins = [{ id: "file-parser", pdf: { engine: "cloudflare-ai" } }];
 
   let lastError = "";
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -160,7 +158,6 @@ export async function askLeader(opts: {
     latency_ms: Date.now() - started,
     usage: usageOf(response),
     question_no: opts.questionNo,
-    max_questions: MAX_QUESTIONS,
   };
 
   if (choice?.finish_reason === "content_filter" || choice?.message?.refusal) {
@@ -206,6 +203,18 @@ export function transcriptForGrader(history: MessageRow[]): string {
     .join("\n");
 }
 
+/** The proposal's text, page by page. Extracted here (not by the model provider) so grading needs no paid "file" feature. */
+async function proposalText(pdfBase64: string): Promise<string> {
+  const pdf = await getDocumentProxy(new Uint8Array(Buffer.from(pdfBase64, "base64")));
+  const { text } = await extractText(pdf, { mergePages: false });
+  const pages = (Array.isArray(text) ? text : [text]).map((t, i) => `=== Halaman ${i + 1} ===\n${t.trim()}`);
+  const joined = pages.join("\n\n");
+  if (joined.replace(/=== Halaman \d+ ===/g, "").trim().length < 80) {
+    throw new Error("Teks di PDF tidak terbaca (mungkin hasil scan/gambar). Minta kelompok mengekspor ulang PDF sebagai teks.");
+  }
+  return joined.slice(0, 120_000);
+}
+
 export async function gradeProposal(opts: {
   pdfBase64: string;
   groupCode: string;
@@ -218,28 +227,27 @@ export async function gradeProposal(opts: {
 }) {
   const executionId = randomUUID();
   const started = Date.now();
+  const proposal = await proposalText(opts.pdfBase64);
 
   const response = await complete({
     model: GRADER_MODEL,
     maxTokens: 8000,
     schemaName: "grader_output",
     schema: GRADER_OUTPUT_SCHEMA,
-    pdf: true,
     messages: [
       { role: "system", content: GRADER_SYSTEM_PROMPT },
       {
         role: "user",
         content: [
           {
-            type: "file",
-            file: {
-              filename: `proposal-${opts.groupCode}.pdf`,
-              file_data: `data:application/pdf;base64,${opts.pdfBase64}`,
-            },
-          },
-          {
             type: "text",
-            text: buildGraderUserText({
+            text: `ISI PROPOSAL KELOMPOK (teks diekstrak dari PDF, per halaman)
+
+${proposal}
+
+---
+
+` + buildGraderUserText({
               groupCode: opts.groupCode,
               picName: opts.picName,
               datasetVersion: opts.datasetVersion,

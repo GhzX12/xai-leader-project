@@ -9,15 +9,20 @@ export type ChatMessage = {
   /** user: the question text; assistant: one entry per chat bubble */
   bubbles: string[];
   questionNo: number | null;
+  /** assistant only: which response mode the leader used (drives the mode banner) */
+  mode: string | null;
+  refusalCode: string | null;
   createdAt: string;
 };
 
 export type AppState = {
   groupCode: string;
+  groupName: string;
+  className: string | null;
   picName: string;
+  sessionLabel: string | null;
   stage: Stage;
   questionsUsed: number;
-  maxQuestions: number;
   dataset: CampaignRow[];
   messages: ChatMessage[];
   submission: { fileName: string | null; pageCount: number | null; submittedAt: string } | null;
@@ -34,6 +39,8 @@ export type SessionRow = {
   agreed_at: string | null;
   submitted_at: string | null;
   last_seen_at: string;
+  session_label: string | null;
+  session_batch: string | null;
 };
 
 export type MessageRow = {
@@ -70,6 +77,8 @@ export function toChatMessage(m: MessageRow): ChatMessage {
     role: m.role,
     bubbles: m.role === "assistant" ? (m.bubbles ?? [m.content]) : [m.content],
     questionNo: m.question_no,
+    mode: m.role === "assistant" ? m.mode : null,
+    refusalCode: m.role === "assistant" ? m.refusal_code : null,
     createdAt: m.created_at,
   };
 }

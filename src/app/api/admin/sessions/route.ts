@@ -12,10 +12,10 @@ export async function GET(req: Request) {
 
   const supabase = db();
   const [groups, sessions, submissions] = await Promise.all([
-    supabase.from("groups").select("*").order("session_no").order("group_name"),
+    supabase.from("groups").select("*").eq("active", true).order("class_name").order("group_name"),
     supabase
       .from("sessions")
-      .select("id, group_code, pic_name, stage, questions_used, started_at, agreed_at, submitted_at, last_seen_at"),
+      .select("id, group_code, pic_name, stage, questions_used, started_at, agreed_at, submitted_at, last_seen_at, session_label, session_batch"),
     supabase.from("submissions").select("session_id, grading_status, grading, page_count, submitted_at"),
   ]);
   if (groups.error || sessions.error || submissions.error) return jsonError(500, "Gagal memuat data.");
@@ -26,9 +26,12 @@ export async function GET(req: Request) {
   const rows = groups.data.map((g) => {
     const s = sessionByCode.get(g.code);
     const sub = s ? subBySession.get(s.id) : undefined;
-    const grading = (sub?.grading ?? null) as { TotalScore?: number; CampaignChosen?: string } | null;
+    const grading = (sub?.grading ?? null) as { TotalScore?: number; CampaignChosen?: string; ScoreInterpretation?: string } | null;
     return {
       code: g.code,
+      groupName: g.group_name,
+      className: g.class_name,
+      token: g.token,
       datasetVersion: g.dataset_version,
       active: g.active,
       session: s ?? null,
@@ -39,6 +42,7 @@ export async function GET(req: Request) {
             submittedAt: sub.submitted_at,
             totalScore: grading?.TotalScore ?? null,
             campaignChosen: grading?.CampaignChosen ?? null,
+            interpretation: grading?.ScoreInterpretation ?? null,
           }
         : null,
     };

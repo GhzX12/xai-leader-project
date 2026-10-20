@@ -12,7 +12,7 @@ import type { AppState } from "@/lib/types";
 import Chat from "./Chat";
 import DataTable from "./DataTable";
 
-/** Tahap 2 (inti): misi + tabel data di kiri, chat dengan XAI Leader di kanan. */
+/** Tahap 2 (inti): misi + tabel data di kiri (lega & nyaman dibaca), chat dengan XAI Leader di kanan. */
 export default function Workspace({
   state,
   onState,
@@ -24,37 +24,65 @@ export default function Workspace({
 }) {
   return (
     <div className="workspace">
-      <div>
-        <div className="card">
-          <h2>Misi Tim</h2>
-          <ul className="small">
+      <div className="panel-stack stagger">
+        <div className="card" style={{ ["--i" as string]: 0 }}>
+          <div className="section-head">
+            <span className="no">01</span>
+            <h2>Misi Tim</h2>
+          </div>
+          <ul>
             {CONTEXT_LINES.map((t) => (
               <li key={t}>{t}</li>
             ))}
           </ul>
           <div className="objective">Objective: {OBJECTIVE}</div>
           <p className="mission-q">{MISSION_QUESTION}</p>
-
-          <h3>Data Campaign</h3>
-          <DataTable rows={state.dataset} />
-          <p className="small muted" style={{ marginTop: 8 }}>
-            CTR = Click ÷ Impression · Conv. Rate = Conversion ÷ Click · CPA = Biaya total ÷ Conversion
-          </p>
         </div>
 
-        <div className="card">
-          <h2>Aturan Diskusi</h2>
-          <ol className="small">
-            {DISCUSSION_RULES.map((t) => (
-              <li key={t}>{t}</li>
-            ))}
-          </ol>
-          <h3>Yang harus dikumpulkan (PDF, min. {MIN_PDF_PAGES} halaman)</h3>
-          <ol className="small">
-            {SUBMISSION_SECTIONS.map((s) => (
-              <li key={s.title}>{s.title}</li>
-            ))}
-          </ol>
+        <div className="card" style={{ ["--i" as string]: 1 }}>
+          <div className="section-head">
+            <span className="no">02</span>
+            <h2>Data Campaign</h2>
+          </div>
+          <DataTable rows={state.dataset} />
+          <div className="legend">
+            <span>
+              <b>CTR</b> = Click ÷ Impression
+            </span>
+            <span>
+              <b>Conv. Rate</b> = Conversion ÷ Click
+            </span>
+            <span>
+              <b>CPA</b> = Biaya total ÷ Conversion
+            </span>
+          </div>
+        </div>
+
+        <div className="card" style={{ ["--i" as string]: 2 }}>
+          <div className="section-head">
+            <span className="no">03</span>
+            <h2>Panduan Singkat</h2>
+          </div>
+          <details className="fold" open>
+            <summary>Cara berdiskusi</summary>
+            <div className="fold-body">
+              <ol>
+                {DISCUSSION_RULES.map((t) => (
+                  <li key={t}>{t}</li>
+                ))}
+              </ol>
+            </div>
+          </details>
+          <details className="fold">
+            <summary>Yang dikumpulkan nanti (PDF, minimal {MIN_PDF_PAGES} halaman)</summary>
+            <div className="fold-body">
+              <ol>
+                {SUBMISSION_SECTIONS.map((s) => (
+                  <li key={s.title}>{s.title}</li>
+                ))}
+              </ol>
+            </div>
+          </details>
         </div>
       </div>
 

@@ -10,6 +10,8 @@ type Group = {
   role: "user" | "assistant";
   bubbles: string[];
   questionNo: number | null;
+  mode: string | null;
+  refusalCode: string | null;
   pending?: boolean;
 };
 
@@ -20,6 +22,8 @@ const toGroup = (m: ChatMessage): Group => ({
   role: m.role,
   bubbles: m.bubbles,
   questionNo: m.questionNo,
+  mode: m.mode,
+  refusalCode: m.refusalCode,
 });
 
 /** Time a bubble "takes to type", so long answers arrive as a natural sequence of messages. */
@@ -44,6 +48,42 @@ function writeFlag(key: string) {
   }
 }
 
+/** Banner that accompanies a leader answer, so the team can see which "mode" XAI Leader is in. */
+function ModeBanner({ group }: { group: Group }) {
+  const refused = group.refusalCode && group.refusalCode !== "NONE";
+  if (refused || group.mode === "refusal") {
+    return (
+      <div className="mode-banner refusal">
+        <div className="txt">
+          <span>Request Rejected</span>
+          <small>Saya hanya menilai dan menjelaskan reasoning, bukan memberi keputusan.</small>
+        </div>
+      </div>
+    );
+  }
+  if (group.mode === "education") {
+    return (
+      <div className="mode-banner education">
+        <div className="txt">
+          <span>Education Mode</span>
+          <small>Penjelasan konsep</small>
+        </div>
+      </div>
+    );
+  }
+  if (group.mode === "strategic") {
+    return (
+      <div className="mode-banner strategic">
+        <div className="txt">
+          <span>Strategic Mode</span>
+          <small>Ulasan alur pikir tim</small>
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
+
 export default function Chat({
   state,
   onState,
@@ -53,7 +93,7 @@ export default function Chat({
   onState: (s: AppState) => void;
   onSubmit: () => void;
 }) {
-  const welcome = welcomeBubbles(state.picName, state.groupCode);
+  const welcome = welcomeBubbles(state.picName, state.groupName);
   const animateWelcome = state.messages.length === 0;
 
   const [welcomeShown, setWelcomeShown] = useState<string[]>(animateWelcome ? [] : welcome);
@@ -65,9 +105,6 @@ export default function Chat({
   const [error, setError] = useState<string | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<ChatMessage[]>(state.messages);
-
-  const remaining = state.maxQuestions - questionsUsed;
-  const exhausted = remaining <= 0;
 
   // Opening message: typed out once per group, shown instantly afterwards.
   useEffect(() => {
@@ -102,12 +139,15 @@ export default function Chat({
 
   const send = async () => {
     const text = input.trim();
-    if (!text || busy || exhausted) return;
+    if (!text || busy) return;
     setError(null);
     setBusy(true);
     setInput("");
     const pendingKey = `p${Date.now()}`;
-    setGroups((g) => [...g, { key: pendingKey, role: "user", bubbles: [text], questionNo: questionsUsed + 1, pending: true }]);
+    setGroups((g) => [
+      ...g,
+      { key: pendingKey, role: "user", bubbles: [text], questionNo: questionsUsed + 1, mode: null, refusalCode: null, pending: true },
+    ]);
     setTyping(true);
 
     const minWait = sleep(randomBuffer());
@@ -122,7 +162,7 @@ export default function Chat({
         return;
       }
       if (typeof res.data?.questionsUsed === "number") setQuestionsUsed(res.data.questionsUsed);
-      if (res.status !== 429) setInput(text);
+      setInput(text);
       setError(res.error);
       setBusy(false);
       return;
@@ -164,27 +204,23 @@ export default function Chat({
   return (
     <section className="card chat" aria-label={`Chat dengan ${LEADER_NAME}`}>
       <div className="chat-head">
-        <div className="avatar">XL</div>
+        <div className="avatar" role="img" aria-label={LEADER_NAME} />
         <div>
-          <div className="title">{LEADER_NAME}</div>
+          <div className="title">{LEADER_NAME.toUpperCase()}</div>
           <div className="sub">
-            <span className="dot-online" /> {LEADER_ROLE}
+            <span className="dot-online" /> {LEADER_ROLE} · online
           </div>
         </div>
-        <div className="quota" aria-live="polite">
-          Sisa pertanyaan: <b>{Math.max(remaining, 0)}</b> / {state.maxQuestions}
-          <div className="pips">
-            {Array.from({ length: state.maxQuestions }, (_, i) => (
-              <span key={i} className={`pip ${i < questionsUsed ? "used" : ""}`} />
-            ))}
-          </div>
+        <div className="q-counter" aria-live="polite">
+          Pertanyaan
+          <b>{questionsUsed}</b>
         </div>
       </div>
 
       <div className="chat-body" ref={bodyRef}>
         {welcomeShown.length > 0 && (
           <div className="msg-group leader">
-            <div className="avatar">XL</div>
+            <div className="avatar" />
             <div className="msg-stack">
               {welcomeShown.map((b, i) => (
                 <div key={i} className="bubble">
@@ -200,7 +236,7 @@ export default function Chat({
             <div key={g.key} className="msg-group user">
               <div className="msg-stack">
                 <div className="msg-meta">
-                  Tim · Pertanyaan {g.questionNo}/{state.maxQuestions}
+                  Tim · Pertanyaan {g.questionNo}
                   {g.pending ? " · mengirim…" : ""}
                 </div>
                 {g.bubbles.map((b, i) => (
@@ -212,8 +248,9 @@ export default function Chat({
             </div>
           ) : (
             <div key={g.key} className="msg-group leader">
-              <div className="avatar">XL</div>
+              <div className="avatar" />
               <div className="msg-stack">
+                <ModeBanner group={g} />
                 {g.bubbles.map((b, i) => (
                   <div key={i} className="bubble">
                     {b}
@@ -226,7 +263,7 @@ export default function Chat({
 
         {typing && (
           <div className="msg-group leader">
-            <div className="avatar">XL</div>
+            <div className="avatar" />
             <div className="bubble typing" aria-label={`${LEADER_NAME} sedang mengetik`}>
               <span />
               <span />
@@ -238,33 +275,25 @@ export default function Chat({
 
       <div className="chat-foot">
         {error && <div className="alert error">{error}</div>}
-        {exhausted ? (
-          <div className="alert warn">
-            Kuota {state.maxQuestions} pertanyaan sudah habis. Lanjutkan diskusi tim, lalu kumpulkan proposal.
-          </div>
-        ) : (
-          <>
-            <div className="composer">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value.slice(0, MAX_CHARS))}
-                onKeyDown={onKeyDown}
-                placeholder={busy ? `${LEADER_NAME} sedang menjawab…` : "Tulis pertanyaan tim untuk XAI Leader…"}
-                disabled={busy}
-                rows={2}
-              />
-              <button className="btn" onClick={() => void send()} disabled={busy || !input.trim()}>
-                Kirim
-              </button>
-            </div>
-            <div className="composer-hint">
-              <span>Enter untuk kirim · Shift+Enter baris baru · setiap pesan = 1 pertanyaan</span>
-              <span>
-                {input.length}/{MAX_CHARS}
-              </span>
-            </div>
-          </>
-        )}
+        <div className="composer">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value.slice(0, MAX_CHARS))}
+            onKeyDown={onKeyDown}
+            placeholder={busy ? `${LEADER_NAME} sedang menjawab…` : "Tulis pertanyaan tim kalian di sini…"}
+            disabled={busy}
+            rows={2}
+          />
+          <button className="btn" onClick={() => void send()} disabled={busy || !input.trim()}>
+            Kirim
+          </button>
+        </div>
+        <div className="composer-hint">
+          <span>Enter untuk kirim · Shift+Enter baris baru · tanya sebanyak yang dibutuhkan</span>
+          <span>
+            {input.length}/{MAX_CHARS}
+          </span>
+        </div>
         <div className="submit-cta">
           <span className="small muted">Sudah selesai berdiskusi dan menyusun PDF?</span>
           <button className="btn accent" onClick={onSubmit} disabled={busy}>

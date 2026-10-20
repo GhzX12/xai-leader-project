@@ -28,7 +28,7 @@ export default function ExperimentApp() {
   }, [refresh]);
 
   const logout = async () => {
-    if (state?.stage === "workspace" && !window.confirm("Keluar dari sesi? Progres tim tetap tersimpan dan bisa dilanjutkan dengan login ulang.")) {
+    if (state?.stage === "workspace" && !window.confirm("Keluar dari sesi? Progres tim tetap tersimpan, dan bisa dilanjutkan dengan login ulang.")) {
       return;
     }
     await api("/api/logout", { method: "POST" });
@@ -37,19 +37,29 @@ export default function ExperimentApp() {
   };
 
   const step = !state ? 1 : state.stage === "submitted" || (state.stage === "workspace" && showSubmit) ? 3 : 2;
+  const view = loading ? "loading" : !state ? "login" : state.stage === "briefing" ? "briefing" : state.stage === "submitted" ? "done" : showSubmit ? "submit" : "workspace";
+
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [view]);
 
   return (
     <>
       <header className="topbar">
-        <div className="brand">
-          {LEADER_NAME}
-          <small>{LEADER_ROLE} · Simulasi Performance Marketing</small>
+        <div className="brandmark">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="" />
+          <div>
+            <div className="name">{LEADER_NAME.toUpperCase()}</div>
+            <div className="role">{LEADER_ROLE}</div>
+          </div>
         </div>
         <div className="spacer" />
         {state && (
           <>
             <div className="who">
-              Kelompok <b>{state.groupCode}</b> · PIC {state.picName}
+              Kelompok <b>{state.groupName}</b> · PIC {state.picName}
+              {state.sessionLabel ? ` · Sesi ${state.sessionLabel}` : ""}
             </div>
             <button className="link-btn" onClick={logout}>
               Keluar
@@ -61,19 +71,23 @@ export default function ExperimentApp() {
       <main className="container">
         <Stepper current={step} finished={state?.stage === "submitted"} />
 
-        {loading ? (
-          <div className="center-screen muted">Memuat…</div>
-        ) : !state ? (
-          <Login onState={setState} />
-        ) : state.stage === "briefing" ? (
-          <Briefing onState={setState} />
-        ) : state.stage === "submitted" ? (
-          <Done state={state} />
-        ) : showSubmit ? (
-          <SubmitPanel onState={setState} onBack={() => setShowSubmit(false)} />
-        ) : (
-          <Workspace state={state} onState={setState} onSubmit={() => setShowSubmit(true)} />
-        )}
+        <div key={view} className="stage-enter">
+          {view === "loading" ? (
+            <div className="center-screen">
+              <div className="loader" />
+            </div>
+          ) : view === "login" ? (
+            <Login onState={setState} />
+          ) : view === "briefing" ? (
+            <Briefing onState={setState} />
+          ) : view === "done" ? (
+            <Done state={state!} />
+          ) : view === "submit" ? (
+            <SubmitPanel onState={setState} onBack={() => setShowSubmit(false)} />
+          ) : (
+            <Workspace state={state!} onState={setState} onSubmit={() => setShowSubmit(true)} />
+          )}
+        </div>
       </main>
     </>
   );

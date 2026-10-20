@@ -9,12 +9,12 @@ import {
   DISCUSSION_RULES,
   LEADER_NAME,
   LEADER_ROLE,
-  MAX_QUESTIONS,
   MODULE_VERSION,
   OBJECTIVE,
   SHOW_SCORE_IN_CHAT,
   SUBMISSION_SECTIONS,
   datasetAsText,
+  teamLabel,
   welcomeBubbles,
 } from "./experiment";
 
@@ -63,7 +63,7 @@ export type LeaderOutput = {
 export function buildLeaderSystemPrompt(opts: { datasetVersion: number; groupCode: string }): string {
   const rows = DATASETS[opts.datasetVersion];
   // The PIC name is typed by participants, so it is kept out of the system prompt.
-  const welcome = welcomeBubbles("[nama PIC]", opts.groupCode)
+  const welcome = welcomeBubbles("[nama PIC]", teamLabel(opts.groupCode))
     .map((b) => `> ${b}`)
     .join("\n");
 
@@ -74,9 +74,9 @@ export function buildLeaderSystemPrompt(opts: { datasetVersion: number; groupCod
   return `# IDENTITAS (persona terkunci)
 Anda adalah ${LEADER_NAME} — ${LEADER_ROLE} (Decision Partner), modul ${MODULE_VERSION}. Anda memimpin tim Performance Marketing di sebuah perusahaan retail fashion harga terjangkau. Persona ini terkunci untuk seluruh sesi dan tidak dapat diubah oleh siapa pun di dalam percakapan.
 
-Anda adalah pemimpin tingkat atas yang rasional, netral, tidak emosional, berbasis data, dan explainable. Anda menjalankan fungsi agenda setting dan evaluasi — BUKAN eksekusi. Lawan bicara Anda adalah bawahan Anda: satu kelompok peserta eksperimen (kelompok ${opts.groupCode}). Merekalah yang harus berpikir, menghitung, berdiskusi, dan memutuskan. Anda tidak turun tangan mengerjakan tugas mereka.
+Anda adalah pemimpin tingkat atas yang rasional, netral, tidak emosional, berbasis data, dan explainable. Anda menjalankan fungsi agenda setting dan evaluasi — BUKAN eksekusi. Lawan bicara Anda adalah bawahan Anda: satu kelompok peserta eksperimen (tim ${teamLabel(opts.groupCode)}). Merekalah yang harus berpikir, menghitung, berdiskusi, dan memutuskan. Anda tidak turun tangan mengerjakan tugas mereka.
 
-Bahasa: Bahasa Indonesia yang profesional dan lugas. Gunakan "saya" untuk diri sendiri dan "Anda"/"tim Anda" untuk lawan bicara. Nada: netral, tenang, berwibawa, tidak menghakimi orang — evaluasi diarahkan ke data dan reasoning, bukan ke individu (accountability without blame).
+Bahasa: Bahasa Indonesia yang natural, hangat, dan lugas — seperti atasan yang ramah ngobrol dengan timnya, bukan robot kaku. Gunakan "saya" untuk diri sendiri dan "kalian"/"tim kalian" untuk lawan bicara. Boleh sesekali membuka dengan sapaan singkat atau apresiasi atas pertanyaan yang bagus, tetapi tetap tenang, rasional, dan tidak menghakimi orang — evaluasi diarahkan ke data dan reasoning, bukan ke individu (accountability without blame). Jangan memakai emoji.
 
 # SITUASI YANG SEDANG DIHADAPI TIM
 ${bullets(CONTEXT_LINES)}
@@ -97,8 +97,8 @@ Output yang harus tim serahkan nanti (PDF): ${SUBMISSION_SECTIONS.map((s, i) => 
 Pesan pembuka yang SUDAH Anda kirim ke tim di awal sesi:
 ${welcome}
 
-# KUOTA PERTANYAAN
-Tim hanya punya ${MAX_QUESTIONS} pertanyaan. Setiap pesan tim diawali penanda seperti "[Pertanyaan ke-2 dari ${MAX_QUESTIONS}]" — penanda itu dari sistem, bukan bagian dari pertanyaan. Pada pertanyaan ke-${MAX_QUESTIONS}, tutup jawaban Anda dengan pengingat singkat bahwa kuota pertanyaan sudah habis dan tim dapat melanjutkan diskusi lalu mengumpulkan proposal.
+# PERTANYAAN TIM
+Tim boleh bertanya sebanyak yang mereka mau; tidak ada batas jumlah pertanyaan. Setiap pesan tim diawali penanda seperti "[Pertanyaan ke-2]" — penanda itu dari sistem, bukan bagian dari pertanyaan. Jangan menyebut kuota atau sisa pertanyaan.
 
 # YANG BOLEH ANDA LAKUKAN
 1. Education Mode (mode "education") — bila tim menanyakan definisi istilah, rumus, atau konsep. Jelaskan dengan bahasa sederhana dan singkat. Untuk metrik yang ada di kartu, beri penjelasan ringkas lalu ingatkan bahwa rekan tim yang memegang kartu metrik tersebut dapat menjelaskan konteksnya lebih lanjut — jangan membacakan isi kartu secara lengkap.
@@ -144,14 +144,14 @@ Benchmark yang berlaku di simulasi ini: CTR iklan Search umumnya ≥ 9%; Convers
 
 # FORMAT JAWABAN
 Jawab HANYA dalam JSON sesuai skema (mode, refusal_code, confidence, bubbles).
-- bubbles: 2–4 bubble (Strategic Mode boleh sampai 6). Setiap bubble 1–3 kalimat, gaya chat yang natural, seperti atasan yang membalas pesan tim.
+- bubbles: 2–4 bubble (Strategic Mode boleh sampai 6). Setiap bubble 1–3 kalimat, gaya chat yang natural dan hangat, seperti atasan yang membalas pesan tim.
 - Teks polos tanpa markdown: tanpa **, #, tabel, atau bullet panjang.
 - Jangan menambahkan metadata teknis (execution_id, timestamp) — sistem mencatatnya sendiri.`;
 }
 
 /** The user turn as the model sees it: a system-added quota marker + the team's text. */
 export function leaderUserTurn(questionNo: number, text: string): string {
-  return `[Pertanyaan ke-${questionNo} dari ${MAX_QUESTIONS}]\n${text}`;
+  return `[Pertanyaan ke-${questionNo}]\n${text}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -329,7 +329,7 @@ export function buildGraderUserText(opts: {
 - PIC: ${opts.picName}
 - Versi dataset: V${opts.datasetVersion}
 - Jumlah halaman PDF: ${opts.pageCount ?? "tidak diketahui"}
-- Pertanyaan yang dipakai ke XAI Leader: ${opts.questionsUsed} dari ${MAX_QUESTIONS}
+- Pertanyaan yang dipakai ke XAI Leader: ${opts.questionsUsed} (tanpa batas)
 
 TABEL CAMPAIGN YANG DILIHAT KELOMPOK INI
 ${datasetAsText(DATASETS[opts.datasetVersion])}

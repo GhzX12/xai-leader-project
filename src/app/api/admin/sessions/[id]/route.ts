@@ -25,7 +25,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   ]);
 
   let downloadUrl: string | null = null;
+  let previewUrl: string | null = null;
   if (submission.data) {
+    const preview = await supabase.storage.from(PROPOSALS_BUCKET).createSignedUrl(submission.data.file_path, 60 * 60);
+    previewUrl = preview.data?.signedUrl ?? null;
     const signed = await supabase.storage
       .from(PROPOSALS_BUCKET)
       .createSignedUrl(submission.data.file_path, 60 * 60, {
@@ -34,7 +37,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     downloadUrl = signed.data?.signedUrl ?? null;
   }
 
+  const { data: teamRow } = await supabase.from("teams").select("id").eq("team_code", group.data?.group_name ?? "").maybeSingle();
+  const members = teamRow
+    ? ((await supabase.from("members").select("name").eq("team_id", teamRow.id).order("id")).data ?? []).map((m) => m.name as string)
+    : [];
+
   return NextResponse.json({
+    members,
+    previewUrl,
     session,
     group: group.data,
     dataset: group.data ? DATASETS[group.data.dataset_version] : [],

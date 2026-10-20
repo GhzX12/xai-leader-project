@@ -2,125 +2,218 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client-api";
-import { EXPERIMENT_TITLE } from "@/lib/experiment";
+import { parseSessionLabel } from "@/lib/experiment";
 import type { AppState } from "@/lib/types";
 
-type Options = { classes: { name: string; groups: string[] }[]; groupNames: string[]; sessions: number[] };
+type ClassOption = { name: string; groups: string[] };
 
-/** Tahap 1: pick class, group + session from the dropdowns; the server verifies "<Kelompok>-<Sesi>". */
+const OTHER = "__other__";
+
+const pad = (n: number) => String(n).padStart(2, "0");
+function nowLabel() {
+  const d = new Date();
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${pad(d.getFullYear() % 100)}: ${pad(d.getHours())}.${pad(d.getMinutes())}`;
+}
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
+
+/** Tahap 1: pick the team → its members appear → pick the PIC, enter the session start time and the paper token. */
 export default function Login({ onState }: { onState: (s: AppState) => void }) {
-  const [options, setOptions] = useState<Options | null>(null);
-  const [className, setClassName] = useState("");
+  const [classes, setClasses] = useState<ClassOption[] | null>(null);
   const [groupName, setGroupName] = useState("");
-  const [sessionNo, setSessionNo] = useState("");
-  const [picName, setPicName] = useState("");
+  const [members, setMembers] = useState<string[] | null>(null);
+  const [picChoice, setPicChoice] = useState("");
+  const [picOther, setPicOther] = useState("");
+  const [sessionLabel, setSessionLabel] = useState("");
+  const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    void api<Options>("/api/groups").then((res) => {
-      if (res.ok) setOptions(res.data);
-      else setError("Daftar kelompok gagal dimuat. Muat ulang halaman ini.");
+    setSessionLabel(nowLabel());
+    void api<{ classes: ClassOption[] }>("/api/groups").then((res) => {
+      if (res.ok) setClasses(res.data.classes);
+      else setError("Daftar kelompok gagal dimuat. Coba muat ulang halaman ini.");
     });
   }, []);
 
-  const groupChoices = className
-    ? (options?.classes.find((c) => c.name === className)?.groups ?? [])
-    : (options?.groupNames ?? []);
-  const showClasses = (options?.classes.filter((c) => c.name).length ?? 0) > 0;
-  const code = groupName && sessionNo ? `${groupName}-${sessionNo}` : null;
+  useEffect(() => {
+    setMembers(null);
+    setPicChoice("");
+    setPicOther("");
+    if (!groupName) return;
+    let cancelled = false;
+    void api<{ members: string[] }>(`/api/groups?team=${encodeURIComponent(groupName)}`).then((res) => {
+      if (cancelled) return;
+      setMembers(res.ok ? res.data.members : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [groupName]);
+
+  const picName = picChoice === OTHER ? picOther.trim() : picChoice;
+  const parsed = parseSessionLabel(sessionLabel);
+  const labelInvalid = sessionLabel.trim().length > 0 && !parsed;
+  const ready = !!groupName && picName.length >= 2 && !!parsed && token.trim().length >= 4;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!ready) return;
     setError(null);
     setBusy(true);
-    const res = await api<AppState>("/api/login", { json: { groupName, sessionNo: Number(sessionNo), picName } });
+    const res = await api<AppState>("/api/login", {
+      json: { groupName, picName, sessionLabel, token: token.trim() },
+    });
     setBusy(false);
     if (res.ok) onState(res.data);
     else setError(res.error);
   };
 
   return (
-    <div className="container narrow" style={{ padding: 0 }}>
-      <div className="card">
-        <h1 className="page-title">{EXPERIMENT_TITLE}</h1>
-        <p className="lead">Tahap 1 — pilih kelompok dan sesi Anda. Sistem akan memverifikasi kode kelompok sebelum sesi dimulai.</p>
+    <div className="login-stage stage-enter">
+      <div className="login-bg" aria-hidden />
+      <form className="login-panel" onSubmit={submit} autoComplete="off">
+        <div className="seal" aria-hidden>
+          <span className="ring" />
+          <span className="ring-2" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.svg" alt="" />
+        </div>
+        <h1 className="login-title">XAI LEADER SYSTEM ACCESS</h1>
+        <p className="login-sub">Verifikasi kelompok diperlukan</p>
 
-        <form onSubmit={submit}>
-          <div className="row">
-            {showClasses && (
-              <div className="field">
-                <label htmlFor="class">Kelas</label>
-                <select
-                  id="class"
-                  value={className}
-                  onChange={(e) => {
-                    setClassName(e.target.value);
-                    setGroupName("");
-                  }}
-                  disabled={!options}
-                >
-                  <option value="">Pilih kelas…</option>
-                  {options?.classes.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name}
+        <div className="form-block">
+          <p className="block-title">1 · Identitas kelompok</p>
+          <div className="field">
+            <label htmlFor="group">Kelompok</label>
+            <select id="group" value={groupName} onChange={(e) => setGroupName(e.target.value)} disabled={!classes}>
+              <option value="">{classes ? "Pilih kelompok kalian…" : "Memuat…"}</option>
+              {classes?.map((c) => (
+                <optgroup key={c.name} label={c.name}>
+                  {c.groups.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
                     </option>
                   ))}
-                </select>
+                </optgroup>
+              ))}
+            </select>
+          </div>
+
+          {groupName && (
+            <div className="roster" key={groupName}>
+              <div className="roster-head">
+                <span className="label">Anggota kelompok · pilih PIC</span>
+                {members && members.length > 0 && <span className="count">{members.length} anggota</span>}
               </div>
-            )}
-            <div className="field">
-              <label htmlFor="group">Kelompok</label>
-              <select
-                id="group"
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                disabled={!options || (showClasses && !className)}
-              >
-                <option value="">{options ? "Pilih kelompok…" : "Memuat…"}</option>
-                {groupChoices.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </select>
+              {members === null ? (
+                <div className="center-screen" style={{ minHeight: 90 }}>
+                  <div className="loader" />
+                </div>
+              ) : (
+                <div className="roster-list">
+                  {members.map((m, i) => (
+                    <button
+                      type="button"
+                      key={m}
+                      className={`roster-item ${picChoice === m ? "selected" : ""}`}
+                      style={{ ["--i" as string]: i }}
+                      onClick={() => setPicChoice(m)}
+                    >
+                      <span className="ini">{initials(m)}</span>
+                      <span className="nm">{m}</span>
+                      <span className="pic-tag">{picChoice === m ? "PIC" : "Pilih"}</span>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    className={`roster-item ${picChoice === OTHER ? "selected" : ""}`}
+                    style={{ ["--i" as string]: members.length }}
+                    onClick={() => setPicChoice(OTHER)}
+                  >
+                    <span className="ini">+</span>
+                    <span className="nm">Nama lain…</span>
+                    <span className="pic-tag">{picChoice === OTHER ? "PIC" : ""}</span>
+                  </button>
+                </div>
+              )}
+              {picChoice === OTHER && (
+                <div className="field" style={{ marginTop: 10 }}>
+                  <input
+                    value={picOther}
+                    onChange={(e) => setPicOther(e.target.value)}
+                    placeholder="Ketik nama PIC"
+                    maxLength={80}
+                    autoFocus
+                  />
+                </div>
+              )}
             </div>
-            <div className="field">
-              <label htmlFor="session">Sesi</label>
-              <select id="session" value={sessionNo} onChange={(e) => setSessionNo(e.target.value)} disabled={!options}>
-                <option value="">Pilih sesi…</option>
-                {options?.sessions.map((s) => (
-                  <option key={s} value={s}>
-                    Sesi {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          )}
+        </div>
 
+        <div className="form-block">
+          <p className="block-title">2 · Waktu &amp; token</p>
           <div className="field">
-            <label htmlFor="pic">Nama PIC kelompok</label>
+            <label htmlFor="sesi">Sesi (mulai mengerjakan)</label>
             <input
-              id="pic"
-              value={picName}
-              onChange={(e) => setPicName(e.target.value)}
-              placeholder="Nama orang yang mengoperasikan perangkat ini"
-              maxLength={60}
-              autoComplete="name"
+              id="sesi"
+              value={sessionLabel}
+              onChange={(e) => setSessionLabel(e.target.value)}
+              placeholder="DD/MM/YY: Jam.Menit"
+              inputMode="numeric"
+              maxLength={20}
+              aria-invalid={labelInvalid}
+              style={labelInvalid ? { borderColor: "var(--danger)" } : undefined}
             />
+            <span className="hint">
+              {labelInvalid ? "Formatnya belum pas. Contoh: 21/10/26: 14.30" : "Format DD/MM/YY: Jam.Menit. Sudah terisi otomatis, silakan ubah kalau perlu."}
+            </span>
           </div>
+          <div className="field">
+            <label htmlFor="token">Token kelompok</label>
+            <input
+              id="token"
+              className="token-input"
+              value={token}
+              onChange={(e) => setToken(e.target.value.replace(/\s/g, "").toUpperCase())}
+              placeholder="Token dari kertas"
+              maxLength={16}
+              spellCheck={false}
+              autoCapitalize="characters"
+            />
+            <span className="hint">Token dibagikan peneliti lewat kertas. Hanya pemegang token hari ini yang bisa masuk.</span>
+          </div>
+        </div>
 
-          <p className="small muted">
-            Kode kelompok: {code ? <span className="code-preview">{code}</span> : <span>—</span>}
-          </p>
+        {error && <div className="alert error">{error}</div>}
 
-          {error && <div className="alert error">{error}</div>}
+        <button className="btn block" style={{ marginTop: 16 }} disabled={!ready || busy}>
+          {busy ? "Memverifikasi…" : "Verify Access  →"}
+        </button>
 
-          <button className="btn block" disabled={!code || picName.trim().length < 2 || busy}>
-            {busy ? "Memverifikasi…" : "Masuk"}
-          </button>
-        </form>
-      </div>
+        <div className="secure-row" aria-hidden>
+          <span className="secure-chip">
+            <svg viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" rx="1.5" /><path d="M5 7V5a3 3 0 0 1 6 0v2" /></svg>
+            Koneksi terenkripsi
+          </span>
+          <span className="secure-chip">
+            <svg viewBox="0 0 16 16"><path d="M8 1.5 13.5 4v4c0 3.2-2.3 5.6-5.5 6.5C4.8 13.6 2.5 11.2 2.5 8V4L8 1.5Z" /><path d="m5.8 8 1.6 1.6L10.4 6.6" /></svg>
+            Token terverifikasi
+          </span>
+          <span className="secure-chip">
+            <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2" /><path d="M8 4.5V8l2.3 1.4" /></svg>
+            Waktu tercatat
+          </span>
+        </div>
+        <p className="login-tagline">Access is privilege. Prove your identity.</p>
+      </form>
     </div>
   );
 }

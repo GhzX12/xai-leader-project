@@ -1,4 +1,6 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { teamCode, parseSessionLabel } from "@/lib/experiment";
 import { jsonError, readJson } from "@/lib/http";
 import { setSessionCookie } from "@/lib/session";
 import { buildState } from "@/lib/state";
@@ -7,45 +9,88 @@ import type { SessionRow } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-/** Tahap 1: verify "<Kelompok>-<Sesi>" against the database, then start or resume that group's session. */
+// Best-effort brute-force guard (per server instance): 6 wrong tokens per team + IP per 10 minutes.
+const FAIL_WINDOW_MS = 10 * 60 * 1000;
+const MAX_FAILS = 6;
+const fails = new Map<string, { count: number; since: number }>();
+
+function failKey(req: Request, team: string) {
+  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
+  return `${ip}|${team}`;
+}
+function tooManyFails(key: string) {
+  const f = fails.get(key);
+  if (!f) return false;
+  if (Date.now() - f.since > FAIL_WINDOW_MS) {
+    fails.delete(key);
+    return false;
+  }
+  return f.count >= MAX_FAILS;
+}
+function addFail(key: string) {
+  const f = fails.get(key);
+  if (!f || Date.now() - f.since > FAIL_WINDOW_MS) fails.set(key, { count: 1, since: Date.now() });
+  else f.count++;
+}
+
+function sameToken(a: string, b: string) {
+  const x = Buffer.from(a.toUpperCase());
+  const y = Buffer.from(b.toUpperCase());
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+/** Tahap 1: verify team + paper token, record the session start time, then start or resume that team's session. */
 export async function POST(req: Request) {
-  const body = await readJson<{ groupName: string; sessionNo: number | string; picName: string }>(req);
+  const body = await readJson<{ groupName: string; token: string; sessionLabel: string; picName: string }>(req);
   const groupName = String(body.groupName ?? "").trim();
-  const sessionNo = Number(body.sessionNo);
+  const token = String(body.token ?? "").trim();
   const picName = String(body.picName ?? "").trim().replace(/\s+/g, " ");
+  const parsedLabel = parseSessionLabel(String(body.sessionLabel ?? ""));
 
-  if (!groupName || !Number.isInteger(sessionNo) || sessionNo < 1) {
-    return jsonError(400, "Pilih kelompok dan sesi terlebih dahulu.");
-  }
-  if (picName.length < 2 || picName.length > 60) {
-    return jsonError(400, "Isi nama PIC (2–60 karakter).");
+  if (!groupName) return jsonError(400, "Pilih kelompok kalian dulu.");
+  if (picName.length < 2 || picName.length > 80) return jsonError(400, "Pilih atau isi nama PIC (2–80 karakter).");
+  if (!parsedLabel) return jsonError(400, "Format sesi belum sesuai. Tulis seperti ini: 21/10/26: 14.30");
+  if (token.length < 4 || token.length > 32) return jsonError(400, "Masukkan token dari kertas yang dibagikan peneliti.");
+
+  const key = failKey(req, groupName);
+  if (tooManyFails(key)) {
+    return jsonError(429, "Terlalu banyak percobaan token yang salah. Tunggu beberapa menit, lalu coba lagi.");
   }
 
-  const code = `${groupName}-${sessionNo}`;
+  const code = teamCode(groupName);
   const supabase = db();
   const { data: group, error: groupError } = await supabase
     .from("groups")
-    .select("code, active")
+    .select("code, active, token")
     .eq("code", code)
     .maybeSingle();
-  if (groupError) return jsonError(500, "Gagal memverifikasi kode kelompok.");
-  if (!group || !group.active) {
-    return jsonError(404, `Kode ${code} tidak terdaftar. Periksa kembali kelompok dan sesi Anda, atau hubungi peneliti.`);
+  if (groupError) return jsonError(500, "Gagal memverifikasi kelompok.");
+
+  // The same message for an unknown team and a wrong token, so tokens can't be probed.
+  if (!group || !group.active || !group.token || !sameToken(token, group.token as string)) {
+    addFail(key);
+    await logEvent(null, "login_failed", { group: groupName });
+    return jsonError(403, "Token tidak cocok dengan kelompok ini. Cek lagi kertas token kalian.");
   }
+  fails.delete(key);
 
   let { data: session } = await supabase.from("sessions").select("*").eq("group_code", code).maybeSingle();
   if (session) {
-    await logEvent(session.id, "login_resume", { pic_name: picName });
+    await logEvent(session.id, "login_resume", { pic_name: picName, session_label: parsedLabel.label });
   } else {
-    const inserted = await supabase.from("sessions").insert({ group_code: code, pic_name: picName }).select("*").single();
+    const inserted = await supabase
+      .from("sessions")
+      .insert({ group_code: code, pic_name: picName, session_label: parsedLabel.label, session_batch: parsedLabel.batch })
+      .select("*")
+      .single();
     if (inserted.error) {
-      // Another device of the same group may have created it a moment ago.
+      // Another device of the same team may have created it a moment ago.
       const again = await supabase.from("sessions").select("*").eq("group_code", code).maybeSingle();
       if (!again.data) return jsonError(500, "Gagal membuat sesi.");
       session = again.data;
     } else {
       session = inserted.data;
-      await logEvent(session.id, "login", { pic_name: picName });
+      await logEvent(session.id, "login", { pic_name: picName, session_label: parsedLabel.label });
     }
   }
 
