@@ -1,6 +1,5 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import Anthropic from "@anthropic-ai/sdk";
 import { MAX_QUESTIONS, MODULE_VERSION } from "./experiment";
 import {
   GRADER_OUTPUT_SCHEMA,
@@ -15,33 +14,71 @@ import {
 } from "./prompts";
 import type { MessageRow } from "./types";
 
-export const CHAT_MODEL = process.env.CHAT_MODEL || "claude-sonnet-5-5";
-export const GRADER_MODEL = process.env.GRADER_MODEL || "claude-opus-5-5";
+// All model calls go through OpenRouter (https://openrouter.ai), an OpenAI-compatible API.
+// Override with CHAT_MODEL / GRADER_MODEL env vars (any OpenRouter model id).
+export const CHAT_MODEL = process.env.CHAT_MODEL || "anthropic/claude-haiku-5.5";
+export const GRADER_MODEL = process.env.GRADER_MODEL || "anthropic/claude-sonnet-5.5";
 
-// Server-side fallback: if a safety classifier declines, the API retries on the
-// model Anthropic recommends for that refusal category, inside the same call.
-const FALLBACK_BETA = "server-side-fallback-2026-07-01";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
-let anthropic: Anthropic | null = null;
-function client(): Anthropic {
-  anthropic ??= new Anthropic(); // reads ANTHROPIC_API_KEY
-  return anthropic;
-}
+type ChatMessage = { role: "system" | "user" | "assistant"; content: string | unknown[] };
 
-function textOf(content: Anthropic.Beta.BetaContentBlock[]): string {
-  return content
-    .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("");
-}
+type ORResponse = {
+  model?: string;
+  choices?: { finish_reason?: string | null; message?: { content?: string | null; refusal?: string | null } }[];
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
+  error?: { message?: string; code?: number | string };
+};
 
-function usageOf(msg: Anthropic.Beta.BetaMessage) {
-  return {
-    input_tokens: msg.usage.input_tokens,
-    output_tokens: msg.usage.output_tokens,
-    cache_read_input_tokens: msg.usage.cache_read_input_tokens ?? 0,
-    cache_creation_input_tokens: msg.usage.cache_creation_input_tokens ?? 0,
+async function complete(opts: {
+  model: string;
+  messages: ChatMessage[];
+  maxTokens: number;
+  schemaName: string;
+  schema: unknown;
+  pdf?: boolean;
+}) {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) throw new Error("OPENROUTER_API_KEY belum diatur.");
+
+  const body: Record<string, unknown> = {
+    model: opts.model,
+    messages: opts.messages,
+    max_tokens: opts.maxTokens,
+    response_format: { type: "json_schema", json_schema: { name: opts.schemaName, strict: true, schema: opts.schema } },
   };
+  // Extract PDF text server-side so any text model can read the proposal (free engine).
+  if (opts.pdf) body.plugins = [{ id: "file-parser", pdf: { engine: "cloudflare-ai" } }];
+
+  let lastError = "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(OPENROUTER_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        "X-Title": "XAI Leader",
+      },
+      body: JSON.stringify(body),
+    });
+    const json = (await res.json().catch(() => ({}))) as ORResponse;
+    if (res.ok && !json.error) return json;
+    lastError = `OpenRouter ${res.status}: ${json.error?.message ?? res.statusText}`;
+    if (res.status !== 429 && res.status < 500) break;
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  throw new Error(lastError);
+}
+
+/** Models sometimes wrap JSON in prose or code fences; take the outermost object. */
+function parseJson(text: string): unknown {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  return JSON.parse(start >= 0 && end > start ? text.slice(start, end + 1) : text);
+}
+
+function usageOf(r: ORResponse) {
+  return { input_tokens: r.usage?.prompt_tokens ?? 0, output_tokens: r.usage?.completion_tokens ?? 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +90,7 @@ export type LeaderResult =
   | { kind: "refused"; category: string | null; metadata: Record<string, unknown> };
 
 /** Previous turns, replayed exactly as they were produced so the history stays append-only. */
-function historyAsMessages(history: MessageRow[]): Anthropic.Beta.BetaMessageParam[] {
+function historyAsMessages(history: MessageRow[]): ChatMessage[] {
   return history.map((m) =>
     m.role === "user"
       ? { role: "user", content: leaderUserTurn(m.question_no ?? 0, m.content) }
@@ -98,51 +135,42 @@ export async function askLeader(opts: {
   const executionId = randomUUID();
   const started = Date.now();
 
-  const response = await client().beta.messages.create({
+  const response = await complete({
     model: CHAT_MODEL,
-    max_tokens: 8000,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
-    system: [
-      {
-        type: "text",
-        text: buildLeaderSystemPrompt({ datasetVersion: opts.datasetVersion, groupCode: opts.groupCode }),
-        cache_control: { type: "ephemeral" },
-      },
-    ],
+    maxTokens: 4000,
+    schemaName: "leader_output",
+    schema: LEADER_OUTPUT_SCHEMA,
     messages: [
+      { role: "system", content: buildLeaderSystemPrompt({ datasetVersion: opts.datasetVersion, groupCode: opts.groupCode }) },
       ...historyAsMessages(opts.history),
       { role: "user", content: leaderUserTurn(opts.questionNo, opts.question) },
     ],
-    output_config: {
-      effort: "medium",
-      format: { type: "json_schema", schema: LEADER_OUTPUT_SCHEMA },
-    },
   });
 
+  const choice = response.choices?.[0];
   const metadata = {
     command: "AskLeader",
     version: MODULE_VERSION,
     execution_id: executionId,
     timestamp: new Date().toISOString(),
     language: "id",
-    model: response.model,
-    fallback_used: response.content.some((b) => b.type === "fallback"),
-    stop_reason: response.stop_reason,
+    model: response.model ?? CHAT_MODEL,
+    fallback_used: !!response.model && response.model !== CHAT_MODEL,
+    stop_reason: choice?.finish_reason ?? null,
     latency_ms: Date.now() - started,
     usage: usageOf(response),
     question_no: opts.questionNo,
     max_questions: MAX_QUESTIONS,
   };
 
-  if (response.stop_reason === "refusal") {
-    return { kind: "refused", category: response.stop_details?.category ?? null, metadata };
+  if (choice?.finish_reason === "content_filter" || choice?.message?.refusal) {
+    return { kind: "refused", category: choice?.finish_reason ?? "refusal", metadata };
   }
 
-  const text = textOf(response.content);
+  const text = choice?.message?.content ?? "";
   let output: LeaderOutput | null = null;
   try {
-    output = cleanLeaderOutput(JSON.parse(text));
+    output = cleanLeaderOutput(parseJson(text));
   } catch {
     output = null;
   }
@@ -191,20 +219,23 @@ export async function gradeProposal(opts: {
   const executionId = randomUUID();
   const started = Date.now();
 
-  const response = await client().beta.messages.create({
+  const response = await complete({
     model: GRADER_MODEL,
-    max_tokens: 16000,
-    betas: [FALLBACK_BETA],
-    fallbacks: "default",
-    system: GRADER_SYSTEM_PROMPT,
+    maxTokens: 8000,
+    schemaName: "grader_output",
+    schema: GRADER_OUTPUT_SCHEMA,
+    pdf: true,
     messages: [
+      { role: "system", content: GRADER_SYSTEM_PROMPT },
       {
         role: "user",
         content: [
           {
-            type: "document",
-            source: { type: "base64", media_type: "application/pdf", data: opts.pdfBase64 },
-            title: `Proposal kelompok ${opts.groupCode}`,
+            type: "file",
+            file: {
+              filename: `proposal-${opts.groupCode}.pdf`,
+              file_data: `data:application/pdf;base64,${opts.pdfBase64}`,
+            },
           },
           {
             type: "text",
@@ -220,20 +251,17 @@ export async function gradeProposal(opts: {
         ],
       },
     ],
-    output_config: {
-      effort: "high",
-      format: { type: "json_schema", schema: GRADER_OUTPUT_SCHEMA },
-    },
   });
 
-  if (response.stop_reason === "refusal") {
-    throw new Error(`Model menolak menilai (kategori: ${response.stop_details?.category ?? "tidak diketahui"}).`);
+  const choice = response.choices?.[0];
+  if (choice?.finish_reason === "content_filter" || choice?.message?.refusal) {
+    throw new Error("Model menolak menilai (content filter).");
   }
-  if (response.stop_reason === "max_tokens") {
+  if (choice?.finish_reason === "length") {
     throw new Error("Jawaban penilai terpotong (max_tokens). Coba nilai ulang.");
   }
 
-  const parsed = JSON.parse(textOf(response.content)) as GraderOutput;
+  const parsed = parseJson(choice?.message?.content ?? "") as GraderOutput;
 
   const scores = { ...parsed.Scores };
   for (const k of Object.keys(SCORE_MAX) as (keyof GraderOutput["Scores"])[]) {
@@ -260,8 +288,8 @@ export async function gradeProposal(opts: {
     SectionCheck: parsed.SectionCheck,
     MetricsUsed: parsed.MetricsUsed,
     Grader: {
-      model: response.model,
-      fallback_used: response.content.some((b) => b.type === "fallback"),
+      model: response.model ?? GRADER_MODEL,
+      fallback_used: !!response.model && response.model !== GRADER_MODEL,
       latency_ms: Date.now() - started,
       usage: usageOf(response),
     },
