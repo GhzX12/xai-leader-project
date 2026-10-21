@@ -127,7 +127,7 @@ export default function Briefing({ onState }: { onState: (s: AppState) => void }
         <label className="check">
           <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
           <span>
-            Kami sudah membaca dan memahami penjelasan di atas, dan setuju percakapan dengan {LEADER_NAME} direkam untuk
+            Kami sudah membaca dan memahami penjelasan di atas, dan setuju percakapan selama sesi ini direkam untuk
             keperluan penelitian.
           </span>
         </label>

@@ -11,7 +11,7 @@ export const maxDuration = 60;
 
 const MAX_MESSAGE_CHARS = 1500;
 
-/** Tahap 2: one question from the team → one XAI Leader answer (split into bubbles). */
+/** Tahap 2: one question from the team → one Leader answer (split into bubbles). */
 export async function POST(req: Request) {
   const session = await currentSession();
   if (!session) return jsonError(401, "Sesi berakhir. Silakan masuk kembali.");
@@ -100,7 +100,7 @@ export async function POST(req: Request) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("chat failed", message);
     await logEvent(session.id, "leader_error", { question_no: questionNo, message });
-    return jsonError(502, "XAI Leader lagi sulit dihubungi. Coba kirim ulang sebentar lagi, ya.", {
+    return jsonError(502, "Pesannya belum terkirim. Coba kirim lagi sebentar lagi, ya.", {
       questionsUsed: questionNo - 1,
     });
   }

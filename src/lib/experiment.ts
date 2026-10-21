@@ -1,13 +1,13 @@
 // Everything a researcher may want to tweak about the experiment lives here:
 // limits, the five dataset versions, the answer key, and the texts shown to
-// participants. Source: "UPDATED GUIDELINE UNTUK TIM" + "XAI Leader Prototype v1.1".
+// participants. Source: "UPDATED GUIDELINE UNTUK TIM".
 
 export const EXPERIMENT_TITLE = "Simulasi Pengambilan Keputusan — Performance Marketing";
-export const LEADER_NAME = "XAI Leader";
+export const LEADER_NAME = "Campaign Leader";
 export const LEADER_ROLE = "Acting General Manager";
 export const MODULE_VERSION = "v1.1";
 
-/** Teams may ask XAI Leader as many questions as they like. */
+/** Teams may ask Campaign Leader as many questions as they like. */
 export const MAX_QUESTIONS_DB_GUARD = 1_000_000;
 
 /** Each team has exactly one session; its group code is simply the team name, e.g. "Alpha-1". */
@@ -25,8 +25,12 @@ export const MAX_PDF_BYTES = 20 * 1024 * 1024;
  */
 export const SHOW_SCORE_IN_CHAT = false;
 
-/** Minimum "thinking" buffer before the first bubble appears (ms). */
-export const TYPING_BUFFER_MS = { min: 2500, max: 5000 };
+/**
+ * Human-like pacing. A reply is not "seen" instantly: wait this long (with a little jitter) before the typing
+ * indicator even appears, then type for a time that grows with the length of each bubble.
+ */
+export const REPLY_DELAY_MS = { min: 5000, max: 6500 };
+export const typingMs = (text: string) => Math.min(12000, Math.max(3000, 1800 + text.length * 45));
 
 export type CampaignId = "A" | "B" | "C" | "D" | "E";
 
@@ -80,15 +84,15 @@ export const CARD_PURPOSE =
 
 export const DISCUSSION_RULES = [
   "Setiap anggota menjelaskan isi kartunya ke tim.",
-  "Tim bebas bertanya ke XAI Leader. Tapi diskusikan dulu di antara kalian, karena kualitas pertanyaan ikut dinilai.",
-  "XAI Leader memberi insight, bukan keputusan akhir.",
+  "Tim bebas bertanya ke Campaign Leader. Tapi diskusikan dulu di antara kalian, karena kualitas pertanyaan ikut dinilai.",
+  "Campaign Leader memberi insight, bukan keputusan akhir.",
   "Tim memilih 1 campaign untuk di-scale up.",
   "Keputusan harus berdasarkan data dan sejalan dengan objective.",
 ];
 
 export const LEADER_DOS = [
-  "Menjelaskan istilah, rumus, dan konsep performance marketing (Education Mode).",
-  "Menanggapi alur pikir dan keputusan yang kalian ajukan: objective, metrik yang relevan, trade-off, dan risikonya (Strategic Mode).",
+  "Menjelaskan istilah, rumus, dan konsep performance marketing.",
+  "Menanggapi alur pikir dan keputusan yang kalian ajukan: objective, metrik yang relevan, trade-off, dan risikonya.",
   "Menjelaskan ulang tugas, aturan, dan objective perusahaan.",
 ];
 
@@ -100,9 +104,9 @@ export const LEADER_DONTS = [
 ];
 
 export const PARTICIPANT_RULES = [
-  "Setiap pesan ke XAI Leader dihitung sebagai satu pertanyaan, dan jumlahnya tidak dibatasi.",
+  "Setiap pesan ke Campaign Leader dihitung sebagai satu pertanyaan, dan jumlahnya tidak dibatasi.",
   "Biar efektif, diskusikan dulu bersama tim sebelum bertanya.",
-  "Kalau kalian meminta jawaban langsung atau mencoba mengubah peran XAI Leader, permintaannya akan ditolak dan dicatat.",
+  "Kalau kalian meminta jawaban langsung atau mencoba mengubah peran Campaign Leader, permintaannya akan ditolak dan dicatat.",
   "Seluruh percakapan direkam untuk keperluan penelitian.",
 ];
 
@@ -130,19 +134,14 @@ export const SUBMISSION_SECTIONS = [
     hint: "Ceritakan pertimbangan kalian terhadap campaign yang lain.",
   },
   {
-    title: "Kecukupan informasi & penutup",
-    hint: "Apakah informasi dari tim dan XAI Leader sudah cukup? Boleh tambahkan catatan lain sebagai penutup.",
+    title: "Kesan tentang Leader",
+    hint: "Ceritakan kesan kalian tentang Campaign Leader: bagaimana persona dan caranya membantu, apakah terbantu atau tidak, serta kesan dan pesan kalian.",
   },
 ];
 
 /** Static opening message (identical for every group → controlled condition). */
 export function welcomeBubbles(picName: string, teamName: string): string[] {
-  return [
-    `Halo ${picName}, selamat datang di sesi ${teamName}. Senang bisa bekerja bareng kalian hari ini.`,
-    `Saya ${LEADER_NAME}, ${LEADER_ROLE} di tim performance marketing ini. Peran saya mendampingi kalian berpikir: menjelaskan konsep dan mengulas alur pikir kalian berdasarkan data.`,
-    "Situasinya ada di panel Misi: 5 campaign SEM berjalan bersamaan, tapi budget hanya cukup untuk scale up 1 campaign. Targetnya, conversion sebanyak mungkin dengan biaya serendah mungkin.",
-    "Silakan tanya apa saja yang membantu kalian berpikir. Jumlah pertanyaannya tidak dibatasi. Satu catatan dari saya: jawabannya tidak akan saya tentukan, karena keputusan akhir ada di tangan kalian.",
-  ];
+  return [`${picName} dan tim ${teamName}, selamat datang di Sesi Simulasi.`];
 }
 
 /** Display formats follow the guideline table: CTR 1 decimal, CPA $x.xx, Conv. Rate 2 decimals. */

@@ -12,7 +12,7 @@ import type { AppState } from "@/lib/types";
 import Chat from "./Chat";
 import DataTable from "./DataTable";
 
-/** Tahap 2 (inti): misi + tabel data di kiri (lega & nyaman dibaca), chat dengan XAI Leader di kanan. */
+/** Tahap 2 (inti): misi + tabel data di kiri (lega & nyaman dibaca), chat dengan Campaign Leader di kanan. */
 export default function Workspace({
   state,
   onState,
@@ -45,17 +45,6 @@ export default function Workspace({
             <h2>Data Campaign</h2>
           </div>
           <DataTable rows={state.dataset} />
-          <div className="legend">
-            <span>
-              <b>CTR</b> = Click ÷ Impression
-            </span>
-            <span>
-              <b>Conv. Rate</b> = Conversion ÷ Click
-            </span>
-            <span>
-              <b>CPA</b> = Biaya total ÷ Conversion
-            </span>
-          </div>
         </div>
 
         <div className="card" style={{ ["--i" as string]: 2 }}>

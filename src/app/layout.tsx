@@ -6,8 +6,8 @@ const body = Manrope({ subsets: ["latin"], variable: "--font-body", display: "sw
 const display = Orbitron({ subsets: ["latin"], variable: "--font-display", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "XAI Leader — Simulasi Performance Marketing",
-  description: "Simulasi pengambilan keputusan tim performance marketing bersama XAI Leader (Acting General Manager).",
+  title: "Campaign Leader — Simulasi Performance Marketing",
+  description: "Simulasi pengambilan keputusan tim performance marketing bersama Campaign Leader (Acting General Manager).",
   robots: { index: false, follow: false },
   icons: { icon: "/logo.svg" },
 };

@@ -36,7 +36,7 @@ export async function GET(req: Request) {
       "GroupCode", "PIC", "DatasetVersion", "Stage", "QuestionsUsed", "JailbreakFlags", "StartedAt", "SubmittedAt",
       "PageCount", "GradingStatus", "CampaignChosen", "AnswerCorrect", "Communication", "InformationIntegration",
       "QuestionQuality", "DataArgumentation", "RiskIdentification", "TotalScore", "ScoreInterpretation",
-      "ConfidenceLevel", "NarrativeSummary",
+      "ConfidenceLevel", "NarrativeSummary", "LeaderPerceived", "LeaderPerceptionReason", "LeaderImpression",
     ];
     const lines = [header.join(",")];
     for (const g of groups.data!) {
@@ -51,6 +51,7 @@ export async function GET(req: Request) {
           sub?.page_count, sub?.grading_status, gr.CampaignChosen, gr.AnswerCorrect, gr.Scores?.Communication,
           gr.Scores?.InformationIntegration, gr.Scores?.QuestionQuality, gr.Scores?.DataArgumentation,
           gr.Scores?.RiskIdentification, gr.TotalScore, gr.ScoreInterpretation, gr.ConfidenceLevel, gr.NarrativeSummary,
+          gr.LeaderPerception?.Perceived, gr.LeaderPerception?.Reason, gr.LeaderPerception?.HelpfulnessImpression,
         ]
           .map(csvCell)
           .join(","),
@@ -59,7 +60,7 @@ export async function GET(req: Request) {
     return new NextResponse(lines.join("\n"), {
       headers: {
         "content-type": "text/csv; charset=utf-8",
-        "content-disposition": `attachment; filename="xai-leader-results.csv"`,
+        "content-disposition": `attachment; filename="campaign-leader-results.csv"`,
       },
     });
   }
@@ -73,6 +74,6 @@ export async function GET(req: Request) {
       events: events.data,
       submissions: submissions.data,
     },
-    { headers: { "content-disposition": `attachment; filename="xai-leader-export.json"` } },
+    { headers: { "content-disposition": `attachment; filename="campaign-leader-export.json"` } },
   );
 }

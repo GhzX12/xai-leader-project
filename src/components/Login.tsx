@@ -79,7 +79,7 @@ export default function Login({ onState }: { onState: (s: AppState) => void }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.svg" alt="" />
         </div>
-        <h1 className="login-title">XAI LEADER SYSTEM ACCESS</h1>
+        <h1 className="login-title">CAMPAIGN LEADER ACCESS</h1>
         <p className="login-sub">Verifikasi kelompok diperlukan</p>
 
         <div className="form-block">

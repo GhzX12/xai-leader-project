@@ -55,7 +55,7 @@ async function complete(opts: {
       headers: {
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
-        "X-Title": "XAI Leader",
+        "X-Title": "Campaign Leader",
       },
       body: JSON.stringify(body),
     });
@@ -80,7 +80,7 @@ function usageOf(r: ORResponse) {
 }
 
 // ---------------------------------------------------------------------------
-// XAI Leader chat
+// Leader chat
 // ---------------------------------------------------------------------------
 
 export type LeaderResult =
@@ -198,7 +198,7 @@ export function transcriptForGrader(history: MessageRow[]): string {
     .map((m) =>
       m.role === "user"
         ? `Pertanyaan ${m.question_no ?? "?"} (tim): ${m.content}`
-        : `XAI Leader [mode=${m.mode ?? "-"}, refusal=${m.refusal_code ?? "NONE"}]: ${(m.bubbles ?? [m.content]).join(" / ")}`,
+        : `Leader [mode=${m.mode ?? "-"}, refusal=${m.refusal_code ?? "NONE"}]: ${(m.bubbles ?? [m.content]).join(" / ")}`,
     )
     .join("\n");
 }
@@ -294,6 +294,7 @@ ${proposal}
     ExecutionID: executionId,
     Justifications: parsed.Justifications,
     SectionCheck: parsed.SectionCheck,
+    LeaderPerception: parsed.LeaderPerception,
     MetricsUsed: parsed.MetricsUsed,
     Grader: {
       model: response.model ?? GRADER_MODEL,

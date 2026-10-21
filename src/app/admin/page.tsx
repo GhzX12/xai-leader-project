@@ -274,7 +274,7 @@ export default function AdminPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.svg" alt="" />
           <div>
-            <div className="name">XAI LEADER</div>
+            <div className="name">CAMPAIGN LEADER</div>
             <div className="role">Dashboard Peneliti</div>
           </div>
         </div>
@@ -307,7 +307,7 @@ export default function AdminPage() {
           <Kpi i={0} label="Kelompok terdaftar" value={rows.length} pct={100} />
           <Kpi i={1} label="Sudah login" value={started} suffix={`/ ${rows.length}`} pct={rows.length ? (started / rows.length) * 100 : 0} />
           <Kpi i={2} label="Proposal terkumpul" value={submitted} suffix={`/ ${rows.length}`} pct={rows.length ? (submitted / rows.length) * 100 : 0} />
-          <Kpi i={3} label="Rata-rata skor AI" value={avg ?? "—"} suffix={avg !== null ? "/ 100" : ""} pct={avg ?? 0} />
+          <Kpi i={3} label="Rata-rata skor" value={avg ?? "—"} suffix={avg !== null ? "/ 100" : ""} pct={avg ?? 0} />
         </section>
 
         <section className="card adm-toolbar">
@@ -459,7 +459,7 @@ export default function AdminPage() {
                 </div>
 
                 <div className="card">
-                  <h2>Laporan penilaian AI</h2>
+                  <h2>Laporan penilaian</h2>
                   {!detail.submission ? (
                     <p className="muted">Kelompok ini belum mengumpulkan proposal.</p>
                   ) : (
@@ -468,7 +468,7 @@ export default function AdminPage() {
                         Status: {gradingBadge(detail.submission.grading_status)}
                         <div style={{ flex: 1 }} />
                         <button className="btn accent small-btn" disabled={!!busy} onClick={() => void grade(detail.session.id)}>
-                          {busy === "grade" ? "Menilai… (±1 menit)" : grading ? "Nilai ulang dengan AI" : "Nilai dengan AI"}
+                          {busy === "grade" ? "Menilai… (±1 menit)" : grading ? "Nilai ulang" : "Nilai proposal"}
                         </button>
                       </div>
                       {detail.submission.grading_error && <div className="alert error">{detail.submission.grading_error}</div>}
@@ -517,11 +517,23 @@ export default function AdminPage() {
                             </div>
                           ))}
 
-                          <h3>Ringkasan AI</h3>
+                          <h3>Ringkasan penilaian</h3>
                           <p>{grading.NarrativeSummary}</p>
                           <p className="small muted">
                             Confidence {grading.ConfidenceLevel} · metrik dipakai: {(grading.MetricsUsed ?? []).join(", ") || "—"}
                           </p>
+                          {grading.LeaderPerception && (
+                            <>
+                              <h3>Kesan tim tentang Leader (halaman 5)</h3>
+                              <p>
+                                <span className={`badge ${grading.LeaderPerception.Perceived === "Human" ? "green" : grading.LeaderPerception.Perceived === "AI" ? "red" : "yellow"}`}>
+                                  {{ Human: "Mengira: orang", AI: "Mengira: mesin", Unsure: "Ragu", NotStated: "Tidak dijawab" }[grading.LeaderPerception.Perceived as string] ?? grading.LeaderPerception.Perceived}
+                                </span>
+                              </p>
+                              <p className="small muted">{grading.LeaderPerception.Reason}</p>
+                              <p>{grading.LeaderPerception.HelpfulnessImpression}</p>
+                            </>
+                          )}
                           <details>
                             <summary className="small muted" style={{ cursor: "pointer" }}>
                               JSON lengkap
@@ -571,7 +583,7 @@ export default function AdminPage() {
                   {detail.messages.map((m) => (
                     <div className={`turn ${m.role}`} key={m.id}>
                       <div className="who">
-                        {m.role === "user" ? `Tim · Pertanyaan ${m.question_no}` : "XAI Leader"}
+                        {m.role === "user" ? `Tim · Pertanyaan ${m.question_no}` : "Campaign Leader"}
                         {m.mode && <span className="badge blue">{m.mode}</span>}
                         {m.refusal_code && m.refusal_code !== "NONE" && <span className="badge red">{m.refusal_code}</span>}
                         {m.confidence && m.confidence !== "NONE" && <span className="badge">confidence {m.confidence}</span>}
