@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { countPdfPages, uploadWithSignedToken } from "@/lib/browser-upload";
 import { api } from "@/lib/client-api";
-import { MAX_PDF_BYTES, MIN_PDF_PAGES, SUBMISSION_SECTIONS } from "@/lib/experiment";
+import { MAX_PDF_BYTES, MIN_PDF_PAGES, SUBMISSION_SECTIONS, TEMPLATE_URL } from "@/lib/experiment";
 import type { AppState } from "@/lib/types";
 
 type Picked = { file: File; pages: number | null; problem: string | null };
@@ -89,6 +89,13 @@ export default function SubmitPanel({ onState, onBack }: { onState: (s: AppState
             </li>
           ))}
         </ol>
+        <p className="small muted">
+          Belum punya PDF-nya? Buka{" "}
+          <a href={TEMPLATE_URL} target="_blank" rel="noopener noreferrer">
+            template dokumen
+          </a>
+          , buat salinan (File, lalu Buat salinan), isi, lalu unduh lewat File, Download, Dokumen PDF (.pdf).
+        </p>
       </div>
 
       <div className="card">

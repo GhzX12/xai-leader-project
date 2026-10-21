@@ -14,6 +14,9 @@ export const MAX_QUESTIONS_DB_GUARD = 1_000_000;
 export const teamCode = (teamName: string) => teamName;
 export const teamLabel = (code: string) => code;
 
+/** Google Docs answer template (view only): teams make a copy, fill it in and download it as PDF. */
+export const TEMPLATE_URL = "https://docs.google.com/document/d/1hiO_Ub0hhFPUAFpBzmvKc-IWitcGEhH7Dqqs7L7WY5s/edit?usp=sharing";
+
 /** Minimum pages of the proposal PDF (one page per required section). */
 export const MIN_PDF_PAGES = 5;
 export const MAX_PDF_BYTES = 20 * 1024 * 1024;
@@ -139,9 +142,38 @@ export const SUBMISSION_SECTIONS = [
   },
 ];
 
-/** Static opening message (identical for every group → controlled condition). */
+/**
+ * Opening message. The first bubble is the same for everyone; the rest is one of 12 wordings, picked from the
+ * team name so a team always sees the same text (on any device) while neighbouring teams differ.
+ */
+const WELCOME_VARIANTS: string[][] = [
+  ["Senang bisa mulai bareng kalian. Di panel Misi ada situasi dan data campaign yang perlu kalian baca dulu.", "Kalau ada yang ingin ditanyakan atau dibahas, tulis saja di sini kapan pun kalian siap."],
+  ["Semoga sesi ini berjalan lancar buat kalian. Pelan-pelan saja, mulai dari membaca misi dan tabel data di sebelah kiri.", "Begitu sudah ada gambaran, ceritakan pemikiran kalian ke saya atau tanyakan hal yang masih membingungkan."],
+  ["Saya Campaign Leader, GM sementara di tim ini. Hari ini saya menemani kalian memutuskan satu campaign yang akan di-scale up.", "Silakan diskusi dulu bersama tim, lalu tanyakan apa saja yang bisa membantu kalian berpikir."],
+  ["Terima kasih sudah bergabung. Tugas kalian hari ini: memilih satu campaign untuk di-scale up dengan budget yang terbatas.", "Datanya ada di panel Misi. Kalau ada yang mau didiskusikan, saya ada di sini."],
+  ["Selamat bergabung di sesi ini. Sebelum ngobrol dengan saya, boleh banget kalian baca misi dan datanya dulu bersama-sama.", "Tidak perlu terburu-buru, tanya saja kapan kalian merasa siap."],
+  ["Saya Campaign Leader, dan saya akan menemani kalian sepanjang sesi ini.", "Mulai dari panel Misi ya. Kalau ada istilah atau pertimbangan yang ingin dibahas, kirim saja pesannya di sini."],
+  ["Senang kalian sudah masuk. Hari ini kalian punya satu keputusan besar: campaign mana yang layak diperbesar dengan budget yang ada.", "Pilihannya tetap di tangan kalian, tapi saya siap membantu kalian menimbang. Tanya apa saja ya."],
+  ["Semoga kalian nyaman. Biasanya tim yang berdiskusi dulu sebelum bertanya akan lebih terarah, jadi silakan baca misi dan datanya bareng-bareng."],
+  ["Selamat datang dan selamat bekerja. Situasi lengkapnya ada di panel Misi, termasuk data kelima campaign.", "Kalau sudah dibaca, kita bisa lanjut ngobrol. Soal konsep maupun cara berpikir, silakan tanya."],
+  ["Saya senang kalian sudah siap. Kita mulai dengan memahami situasi di panel Misi dulu ya.", "Setelah itu, bagikan pemikiran kalian ke saya atau tanyakan hal yang masih kurang jelas."],
+  ["Sesi ini santai tapi serius ya. Baca misi dan data campaign dengan teliti sebelum kalian mengambil keputusan.", "Saya menemani dari sini. Tulis saja kalau ada yang ingin dibahas."],
+  ["Mari kita mulai. Misi dan data campaign sudah tersedia di panel sebelah kiri.", "Silakan luangkan waktu untuk membacanya. Kalau sudah siap, kirim pertanyaan atau pemikiran kalian di sini."],
+];
+
+const TEAM_CLASSES = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliett"];
+
+export function welcomeVariant(teamName: string): number {
+  const m = /^([A-Za-z]+)-(\d+)$/.exec(teamName);
+  const c = m ? TEAM_CLASSES.indexOf(m[1].toLowerCase()) : -1;
+  if (m && c >= 0) return (c * 8 + Number(m[2]) - 1) % WELCOME_VARIANTS.length;
+  let h = 0;
+  for (const ch of teamName) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return h % WELCOME_VARIANTS.length;
+}
+
 export function welcomeBubbles(picName: string, teamName: string): string[] {
-  return [`${picName} dan tim ${teamName}, selamat datang di Sesi Simulasi.`];
+  return [`${picName} dan tim ${teamName}, selamat datang di Sesi Simulasi.`, ...WELCOME_VARIANTS[welcomeVariant(teamName)]];
 }
 
 /** Display formats follow the guideline table: CTR 1 decimal, CPA $x.xx, Conv. Rate 2 decimals. */

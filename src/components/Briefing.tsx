@@ -15,6 +15,7 @@ import {
   OBJECTIVE,
   PARTICIPANT_RULES,
   SUBMISSION_SECTIONS,
+  TEMPLATE_URL,
 } from "@/lib/experiment";
 import type { AppState } from "@/lib/types";
 
@@ -121,6 +122,26 @@ export default function Briefing({ onState }: { onState: (s: AppState) => void }
             <li key={t}>{t}</li>
           ))}
         </ul>
+
+        <h3>Template jawaban</h3>
+        <p>
+          Semua kelompok menulis jawaban di template Google Docs yang sama (5 halaman, satu bagian per halaman). Template ini
+          hanya bisa dilihat, jadi buat salinannya dulu:
+        </p>
+        <ol>
+          <li>Buka template lewat tombol di bawah.</li>
+          <li>
+            Klik <b>File</b>, lalu <b>Buat salinan</b> (Make a copy), dan simpan di Google Drive kalian.
+          </li>
+          <li>Isi semua halaman pada salinan itu bersama tim.</li>
+          <li>
+            Kalau sudah selesai, klik <b>File</b>, lalu <b>Download</b>, lalu <b>Dokumen PDF (.pdf)</b>. File PDF itulah yang
+            diunggah di akhir sesi.
+          </li>
+        </ol>
+        <a className="btn secondary" href={TEMPLATE_URL} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", marginTop: 6 }}>
+          Buka template dokumen ↗
+        </a>
       </div>
 
       <div className="card" style={{ ["--i" as string]: 4 }}>
