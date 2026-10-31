@@ -41,6 +41,7 @@ export type SessionRow = {
   last_seen_at: string;
   session_label: string | null;
   session_batch: string | null;
+  manager_typing_until: string | null;
 };
 
 export type MessageRow = {
@@ -54,6 +55,7 @@ export type MessageRow = {
   refusal_code: string | null;
   confidence: string | null;
   metadata: Record<string, unknown> | null;
+  author: string | null;
   created_at: string;
 };
 

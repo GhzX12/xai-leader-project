@@ -33,6 +33,7 @@ export async function GET(req: Request) {
       className: g.class_name,
       token: g.token,
       datasetVersion: g.dataset_version,
+      managerMode: (g.manager_mode ?? "ai") as string,
       active: g.active,
       session: s ?? null,
       submission: sub

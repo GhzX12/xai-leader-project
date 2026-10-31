@@ -33,7 +33,7 @@ export async function GET(req: Request) {
 
   if (format === "csv") {
     const header = [
-      "GroupCode", "PIC", "DatasetVersion", "Stage", "QuestionsUsed", "JailbreakFlags", "StartedAt", "SubmittedAt",
+      "GroupCode", "ManagerMode", "HumanAnswers", "PIC", "DatasetVersion", "Stage", "QuestionsUsed", "JailbreakFlags", "StartedAt", "SubmittedAt",
       "PageCount", "GradingStatus", "CampaignChosen", "AnswerCorrect", "Communication", "InformationIntegration",
       "QuestionQuality", "DataArgumentation", "RiskIdentification", "TotalScore", "ScoreInterpretation",
       "ConfidenceLevel", "NarrativeSummary", "LeaderPerceived", "LeaderPerceptionReason", "LeaderImpression",
@@ -45,9 +45,10 @@ export async function GET(req: Request) {
       const sub = submissions.data!.find((x) => x.session_id === s.id);
       const gr = (sub?.grading ?? {}) as Record<string, any>;
       const flags = events.data!.filter((e) => e.session_id === s.id && e.type === "jailbreak_attempt").length;
+      const humanAnswers = messages.data!.filter((m) => m.session_id === s.id && m.role === "assistant" && m.author && m.author !== "ai").length;
       lines.push(
         [
-          g.code, s.pic_name, `V${g.dataset_version}`, s.stage, s.questions_used, flags, s.started_at, s.submitted_at,
+          g.code, g.manager_mode ?? "ai", humanAnswers, s.pic_name, `V${g.dataset_version}`, s.stage, s.questions_used, flags, s.started_at, s.submitted_at,
           sub?.page_count, sub?.grading_status, gr.CampaignChosen, gr.AnswerCorrect, gr.Scores?.Communication,
           gr.Scores?.InformationIntegration, gr.Scores?.QuestionQuality, gr.Scores?.DataArgumentation,
           gr.Scores?.RiskIdentification, gr.TotalScore, gr.ScoreInterpretation, gr.ConfidenceLevel, gr.NarrativeSummary,

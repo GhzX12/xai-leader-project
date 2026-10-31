@@ -13,6 +13,7 @@ type Group = {
 };
 
 const MAX_CHARS = 1500;
+const POLL_MS = 2000;
 
 const toGroup = (m: ChatMessage): Group => ({ key: `m${m.id}`, role: m.role, bubbles: m.bubbles });
 
@@ -54,8 +55,11 @@ export default function Chat({
   const [busy, setBusy] = useState(false);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // A question is waiting for an answer from the other side (shown as soon as it arrives, typing indicator included).
+  const [awaiting, setAwaiting] = useState(() => state.messages.length > 0 && state.messages[state.messages.length - 1].role === "user");
   const bodyRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<ChatMessage[]>(state.messages);
+  const maxIdRef = useRef<number>(state.messages.reduce((a, m) => Math.max(a, m.id), 0));
 
   // Opening message: arrives after a short pause, once per team; shown instantly afterwards.
   useEffect(() => {
@@ -86,6 +90,39 @@ export default function Chat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Waiting for a live answer: check for new messages every couple of seconds.
+  useEffect(() => {
+    if (!awaiting) return;
+    let stopped = false;
+    const tick = async () => {
+      const res = await api<{ messages: ChatMessage[]; typing: boolean }>(`/api/chat/poll?after=${maxIdRef.current}`);
+      if (stopped) return;
+      if (!res.ok) {
+        if (res.status === 401) window.location.reload();
+        return;
+      }
+      const fresh = res.data.messages.filter((m) => m.id > maxIdRef.current);
+      if (fresh.length) {
+        maxIdRef.current = Math.max(maxIdRef.current, ...fresh.map((m) => m.id));
+        messagesRef.current = [...messagesRef.current, ...fresh];
+        setGroups((g) => [...g, ...fresh.filter((m) => !g.some((x) => x.key === `m${m.id}`)).map(toGroup)]);
+        setTyping(false);
+        setAwaiting(false);
+        onState({ ...state, messages: messagesRef.current });
+      } else {
+        setTyping(res.data.typing);
+      }
+    };
+    void tick();
+    const timer = window.setInterval(() => void tick(), POLL_MS);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+      setTyping(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaiting]);
+
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: "smooth" });
   }, [groups, welcomeShown, typing]);
@@ -101,7 +138,19 @@ export default function Chat({
 
     // The other side does not react at once: nothing happens for a few seconds, then they start typing.
     const pause = sleep(replyDelay());
-    const res = await api<{ messages: ChatMessage[]; questionsUsed: number }>("/api/chat", { json: { message: text } });
+    const res = await api<{ messages: ChatMessage[]; questionsUsed: number; awaiting?: boolean }>("/api/chat", { json: { message: text } });
+
+    // Answered live by a person: no artificial pause, the reply simply arrives when they send it.
+    if (res.ok && res.data.awaiting) {
+      const [userMsg] = res.data.messages;
+      maxIdRef.current = Math.max(maxIdRef.current, userMsg.id);
+      messagesRef.current = [...messagesRef.current, userMsg];
+      setGroups((g) => g.map((x) => (x.key === pendingKey ? toGroup(userMsg) : x)));
+      onState({ ...state, messages: messagesRef.current, questionsUsed: res.data.questionsUsed });
+      setAwaiting(true);
+      setBusy(false);
+      return;
+    }
     await pause;
 
     if (!res.ok) {
@@ -117,6 +166,7 @@ export default function Chat({
     }
 
     const [userMsg, leaderMsg] = res.data.messages;
+    maxIdRef.current = Math.max(maxIdRef.current, userMsg.id, leaderMsg.id);
     setGroups((g) => g.map((x) => (x.key === pendingKey ? toGroup(userMsg) : x)));
 
     // Reveal the answer bubble by bubble; every bubble is "typed" for a while first.

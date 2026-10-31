@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { askLeader } from "@/lib/claude";
 import { MAX_QUESTIONS_DB_GUARD } from "@/lib/experiment";
 import { jsonError, readJson } from "@/lib/http";
+import { isHumanMode } from "@/lib/manager";
 import { currentSession, groupOf } from "@/lib/session";
 import { db, logEvent } from "@/lib/supabase";
 import { toChatMessage, type MessageRow } from "@/lib/types";
@@ -45,6 +46,18 @@ export async function POST(req: Request) {
     ]);
     if (historyError) throw new Error(historyError.message);
 
+    // Human / hybrid teams: store the question and wait for the manager to answer (the page polls for the reply).
+    if (isHumanMode(group.manager_mode)) {
+      const { data: row, error: rowError } = await supabase
+        .from("messages")
+        .insert({ session_id: session.id, role: "user", content: question, question_no: questionNo })
+        .select("*")
+        .single();
+      if (rowError || !row) throw new Error(rowError?.message ?? "insert failed");
+      await logEvent(session.id, "question_to_manager", { question_no: questionNo, mode: group.manager_mode });
+      return NextResponse.json({ messages: [toChatMessage(row as MessageRow)], questionsUsed: questionNo, awaiting: true });
+    }
+
     const result = await askLeader({
       datasetVersion: group.dataset_version,
       groupCode: session.group_code,
@@ -76,6 +89,7 @@ export async function POST(req: Request) {
           refusal_code: output.refusal_code,
           confidence: output.confidence,
           metadata,
+          author: "ai",
         },
       ])
       .select("*")

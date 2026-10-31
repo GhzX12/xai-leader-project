@@ -572,3 +572,49 @@ pre.json { font-family: var(--mono); font-size: 12px; background: var(--field); 
   .hero h1 { font-size: 21px; }
   .verdict { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---------- manager console ---------- */
+.mgr { display: grid; grid-template-columns: 300px minmax(0, 1fr) 320px; gap: 14px; padding: 14px; height: calc(100vh - 66px); min-height: 520px; }
+.mgr > .card { padding: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.mgr-pane-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.mgr-pane-head h2 { margin: 0; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; flex: 1; }
+.mgr-list { overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.mgr-item { text-align: left; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--line-soft); border-radius: 12px; padding: 10px 12px; color: inherit; cursor: pointer; font: inherit; transition: border-color 0.2s, background 0.2s; }
+.mgr-item:hover { border-color: var(--line-strong); }
+.mgr-item.selected { border-color: var(--gold); background: rgba(214, 179, 106, 0.08); }
+.mgr-item.waiting { border-left: 3px solid var(--danger); }
+.mgr-item-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.mgr-item-top b { flex: 1; }
+.mgr-count { background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px; }
+.mgr-preview { font-size: 12.5px; color: var(--muted); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mgr-wait { font-size: 12px; color: var(--warn); margin-top: 4px; }
+.mgr-pending { padding: 10px 6px; display: flex; flex-wrap: wrap; gap: 6px; }
+.mgr-pending .label { width: 100%; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+.mgr-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.mgr-msg { display: flex; flex-direction: column; gap: 4px; max-width: 78%; }
+.mgr-msg.from-team { align-self: flex-start; }
+.mgr-msg.from-me { align-self: flex-end; align-items: flex-end; }
+.mgr-msg-meta { font-size: 11.5px; color: var(--faint); }
+.mgr-bubble { padding: 10px 14px; border-radius: 14px; font-size: 14.5px; line-height: 1.5; white-space: pre-wrap; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line-soft); }
+.mgr-msg.from-me .mgr-bubble { background: rgba(83, 180, 255, 0.12); border-color: rgba(83, 180, 255, 0.3); }
+.mgr-bubble.draft { background: rgba(214, 179, 106, 0.08); border: 1px dashed var(--line-strong); }
+.mgr-compose { border-top: 1px solid var(--line); padding: 12px 16px; background: rgba(10, 12, 17, 0.9); }
+.mgr-ai { border: 1px solid var(--line-strong); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; background: rgba(214, 179, 106, 0.04); }
+.mgr-ai-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mgr-draft { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.mgr-draft-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.mgr-info { padding: 0; overflow-y: auto; }
+.mgr-info > :not(.mgr-pane-head) { margin-left: 16px; margin-right: 16px; }
+.mgr-info > .mgr-pane-head { margin: 0; }
+.mgr-info .btn { margin-bottom: 8px; }
+@media (max-width: 1100px) {
+  .mgr { grid-template-columns: 260px minmax(0, 1fr); }
+  .mgr-info { display: none; }
+}
+@media (max-width: 720px) {
+  .mgr { grid-template-columns: 1fr; height: auto; }
+  .mgr > .card { max-height: 70vh; }
+}
+.mgr-select { background: var(--field); color: var(--text, inherit); border: 1px solid var(--line-soft); border-radius: 8px; padding: 4px 8px; font-size: 12px; }
+.mgr-select.green { border-color: rgba(94, 224, 194, 0.4); color: var(--ok); }
+.mgr-select.gold { border-color: var(--line-strong); color: var(--gold-hi); }

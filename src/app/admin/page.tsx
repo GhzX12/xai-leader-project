@@ -7,12 +7,23 @@ import type { CampaignRow } from "@/lib/experiment";
 
 const PASSWORD_KEY = "xai-admin-password";
 
+type ManagerMode = "ai" | "human" | "hybrid";
+const MANAGER_LABEL: Record<ManagerMode, string> = { ai: "GM AI", human: "GM Human", hybrid: "GM Human + AI" };
+const MANAGER_BADGE: Record<ManagerMode, string> = { ai: "", human: "green", hybrid: "gold" };
+const AUTHOR_LABEL: Record<string, string> = {
+  ai: "AI",
+  human: "Human",
+  human_ai_sent: "Human + AI (draf dikirim apa adanya)",
+  human_ai_edited: "Human + AI (draf diedit)",
+};
+
 type OverviewRow = {
   code: string;
   groupName: string;
   className: string | null;
   token: string | null;
   datasetVersion: number;
+  managerMode: ManagerMode;
   active: boolean;
   session: {
     id: string;
@@ -123,6 +134,7 @@ export default function AdminPage() {
   const [batchFilter, setBatchFilter] = useState("");
   const [classFilter, setClassFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [managerFilter, setManagerFilter] = useState("");
 
   const headers = useCallback(() => ({ "x-admin-password": password }), [password]);
 
@@ -186,6 +198,16 @@ export default function AdminPage() {
     await loadOverview();
   };
 
+  const setManager = async (code: string, mode: ManagerMode) => {
+    const res = await api(`/api/admin/groups/${encodeURIComponent(code)}`, { method: "PATCH", headers: headers(), json: { managerMode: mode } });
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    setRows((list) => list.map((r) => (r.code === code ? { ...r, managerMode: mode } : r)));
+    setDetail((d) => (d?.group && d.group.code === code ? { ...d, group: { ...d.group, manager_mode: mode } } : d));
+  };
+
   const download = async (format: "json" | "csv") => {
     const res = await fetch(`/api/admin/export?format=${format}`, { headers: headers() });
     if (!res.ok) {
@@ -213,10 +235,11 @@ export default function AdminPage() {
         const st = !r.session ? "idle" : r.submission ? "submitted" : r.session.stage;
         if (st !== statusFilter) return false;
       }
+      if (managerFilter && r.managerMode !== managerFilter) return false;
       if (needle && !`${r.groupName} ${r.session?.pic_name ?? ""} ${r.token ?? ""}`.toLowerCase().includes(needle)) return false;
       return true;
     });
-  }, [rows, q, batchFilter, classFilter, statusFilter]);
+  }, [rows, q, batchFilter, classFilter, statusFilter, managerFilter]);
 
   const grouped = useMemo(() => {
     const out = new Map<string, Map<string, OverviewRow[]>>();
@@ -258,6 +281,7 @@ export default function AdminPage() {
     );
   }
 
+  const modeCount = (m: ManagerMode) => rows.filter((r) => r.managerMode === m).length;
   const started = rows.filter((r) => r.session).length;
   const submitted = rows.filter((r) => r.submission).length;
   const scored = rows.filter((r) => r.submission?.totalScore != null);
@@ -310,6 +334,10 @@ export default function AdminPage() {
           <Kpi i={3} label="Rata-rata skor" value={avg ?? "—"} suffix={avg !== null ? "/ 100" : ""} pct={avg ?? 0} />
         </section>
 
+        <p className="small muted" style={{ margin: "0 0 12px" }}>
+          Manajer penguji: <b>{modeCount("ai")}</b> kelompok GM AI · <b>{modeCount("human")}</b> GM Human · <b>{modeCount("hybrid")}</b> GM Human + AI
+        </p>
+
         <section className="card adm-toolbar">
           <div className="field grow">
             <label htmlFor="q">Cari</label>
@@ -335,6 +363,15 @@ export default function AdminPage() {
                   {c}
                 </option>
               ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="fm">Manajer</label>
+            <select id="fm" value={managerFilter} onChange={(e) => setManagerFilter(e.target.value)}>
+              <option value="">Semua manajer</option>
+              <option value="ai">GM AI</option>
+              <option value="human">GM Human</option>
+              <option value="hybrid">GM Human + AI</option>
             </select>
           </div>
           <div className="field">
@@ -371,6 +408,7 @@ export default function AdminPage() {
                               <tr>
                                 <th>Kelompok</th>
                                 <th>Data</th>
+                                <th>Manajer</th>
                                 <th>Token</th>
                                 <th>PIC</th>
                                 <th>Status</th>
@@ -390,6 +428,18 @@ export default function AdminPage() {
                                     <b>{r.groupName}</b>
                                   </td>
                                   <td className="muted">V{r.datasetVersion}</td>
+                                  <td onClick={(e) => e.stopPropagation()}>
+                                    <select
+                                      className={`mgr-select ${MANAGER_BADGE[r.managerMode]}`}
+                                      value={r.managerMode}
+                                      onChange={(e) => void setManager(r.code, e.target.value as ManagerMode)}
+                                      aria-label={`Manajer penguji ${r.groupName}`}
+                                    >
+                                      <option value="ai">GM AI</option>
+                                      <option value="human">GM Human</option>
+                                      <option value="hybrid">GM Human + AI</option>
+                                    </select>
+                                  </td>
                                   <td className="token-chip">{r.token ?? "—"}</td>
                                   <td>{r.session?.pic_name ?? "—"}</td>
                                   <td>
@@ -436,6 +486,9 @@ export default function AdminPage() {
                     <h2>{detailLabel}</h2>
                     {detail.group?.class_name && <span className="badge gold">{detail.group.class_name}</span>}
                     <span className="badge blue">Dataset V{detail.group?.dataset_version}</span>
+                    <span className={`badge ${MANAGER_BADGE[(detail.group?.manager_mode ?? "ai") as ManagerMode]}`}>
+                      {MANAGER_LABEL[(detail.group?.manager_mode ?? "ai") as ManagerMode]}
+                    </span>
                     {stageBadge(detail.session.stage)}
                     <div style={{ flex: 1 }} />
                     <button className="btn danger small-btn" disabled={!!busy} onClick={() => void reset(detail.session.id, String(detailLabel))}>
@@ -584,6 +637,7 @@ export default function AdminPage() {
                     <div className={`turn ${m.role}`} key={m.id}>
                       <div className="who">
                         {m.role === "user" ? `Tim · Pertanyaan ${m.question_no}` : "Campaign Leader"}
+                        {m.role === "assistant" && <span className={`badge ${m.author && m.author !== "ai" ? "gold" : ""}`}>{AUTHOR_LABEL[m.author ?? "ai"] ?? m.author}</span>}
                         {m.mode && <span className="badge blue">{m.mode}</span>}
                         {m.refusal_code && m.refusal_code !== "NONE" && <span className="badge red">{m.refusal_code}</span>}
                         {m.confidence && m.confidence !== "NONE" && <span className="badge">confidence {m.confidence}</span>}

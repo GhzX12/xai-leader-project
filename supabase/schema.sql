@@ -163,3 +163,15 @@ insert into public.groups (code, group_name, session_no, dataset_version)
 select name || '-' || session_no, name, session_no, ((rn - 1) % 5) + 1
   from combos
 on conflict (code) do nothing;
+
+-- ---------------------------------------------------------------------
+-- 10. Human / hybrid General Manager.
+--     groups.manager_mode: who answers the team ('ai' | 'human' | 'hybrid'),
+--     set by the researchers in /admin. Every pre-existing team is 'ai'.
+--     messages.author: ai | human | human_ai_sent | human_ai_edited.
+--     sessions.manager_typing_until: typing heartbeat shown to the team.
+-- ---------------------------------------------------------------------
+alter table public.groups add column if not exists manager_mode text not null default 'ai'
+  check (manager_mode in ('ai', 'human', 'hybrid'));
+alter table public.messages add column if not exists author text;
+alter table public.sessions add column if not exists manager_typing_until timestamptz;
